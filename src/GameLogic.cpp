@@ -10,9 +10,88 @@
 #include <timeapi.h>
 #include <DirectXMath.h>
 #include "CameraBob.hpp"
+#include <vector> // Added for std::vector
+#include "AnimationEnums.hpp" // Added for animation enums
 using namespace DirectX;
 
 #pragma comment( lib, "Winmm.lib" )
+
+// Define a structure to hold level data
+struct LevelData {
+    int xp_threshold;
+    int level;
+};
+
+// Global vector to store level thresholds
+std::vector<LevelData> level_thresholds;
+
+// Helper function to initialize level thresholds
+void InitializeLevelThresholds() {
+    level_thresholds.push_back({0, 0}); // Base level or initial state
+    level_thresholds.push_back({2000, 1});
+    level_thresholds.push_back({4000, 2});
+    level_thresholds.push_back({8000, 3});
+    level_thresholds.push_back({18000, 4});
+    level_thresholds.push_back({35000, 5});
+    level_thresholds.push_back({70000, 6});
+    level_thresholds.push_back({125000, 7});
+    level_thresholds.push_back({250000, 8});
+    level_thresholds.push_back({500000, 9});
+    level_thresholds.push_back({750000, 10});
+    level_thresholds.push_back({1000000, 11});
+    level_thresholds.push_back({1250000, 12});
+    level_thresholds.push_back({1500000, 13});
+    level_thresholds.push_back({1750000, 14});
+    level_thresholds.push_back({2000000, 15});
+    level_thresholds.push_back({2250000, 16});
+    level_thresholds.push_back({2500000, 17});
+    level_thresholds.push_back({2750000, 18});
+    level_thresholds.push_back({3000000, 19});
+    level_thresholds.push_back({3250000, 20});
+    level_thresholds.push_back({3500000, 21});
+    level_thresholds.push_back({3750000, 22});
+    level_thresholds.push_back({4000000, 23});
+    level_thresholds.push_back({4250000, 24});
+    level_thresholds.push_back({4500000, 25});
+    level_thresholds.push_back({4750000, 26});
+    level_thresholds.push_back({5000000, 27});
+    level_thresholds.push_back({5250000, 28});
+    level_thresholds.push_back({5500000, 29});
+    level_thresholds.push_back({5750000, 30});
+    level_thresholds.push_back({6000000, 31});
+    level_thresholds.push_back({6250000, 32});
+    level_thresholds.push_back({6500000, 33});
+    level_thresholds.push_back({6750000, 34});
+    level_thresholds.push_back({7000000, 35});
+    level_thresholds.push_back({7250000, 36});
+    level_thresholds.push_back({7500000, 37});
+    level_thresholds.push_back({7750000, 38});
+    level_thresholds.push_back({8000000, 39});
+    level_thresholds.push_back({8250000, 40});
+    level_thresholds.push_back({8500000, 41});
+    level_thresholds.push_back({8750000, 42});
+    level_thresholds.push_back({9000000, 43});
+    level_thresholds.push_back({9250000, 44});
+    level_thresholds.push_back({9500000, 45});
+    level_thresholds.push_back({9750000, 46});
+    level_thresholds.push_back({10000000, 47});
+    level_thresholds.push_back({10250000, 48});
+    level_thresholds.push_back({10500000, 49});
+    level_thresholds.push_back({10750000, 50});
+    level_thresholds.push_back({11000000, 51});
+    level_thresholds.push_back({11250000, 52});
+    level_thresholds.push_back({11500000, 53});
+    level_thresholds.push_back({11750000, 54});
+    level_thresholds.push_back({12000000, 55});
+    level_thresholds.push_back({12250000, 56});
+    level_thresholds.push_back({12500000, 57});
+    level_thresholds.push_back({12750000, 58});
+    level_thresholds.push_back({13000000, 59});
+    level_thresholds.push_back({13250000, 60});
+    level_thresholds.push_back({13500000, 61});
+    // Add a very high value for levels beyond the defined ones to prevent out of bounds
+    level_thresholds.push_back({2000000000, 62}); // Represents max level or beyond
+}
 
 //Monster
 int monsterenable = 1;
@@ -277,7 +356,7 @@ void MoveMonsters(float fElapsedTime)
 				if (monster_list[i].attackspeed <= 0)
 				{
 
-					SetMonsterAnimationSequence(i, 2);
+					SetMonsterAnimationSequence(i, static_cast<int>(MonsterAnimSequence::ATTACK));
 					monster_list[i].attackspeed = 30 - (monster_list[i].hd);
 					if (monster_list[i].attackspeed <= 0)
 						monster_list[i].attackspeed = 0;
@@ -315,7 +394,7 @@ void MoveMonsters(float fElapsedTime)
 						{
 						case 0:
 
-							SetMonsterAnimationSequence(i, 7);
+							SetMonsterAnimationSequence(i, static_cast<int>(MonsterAnimSequence::FLIP));
 							break;
 						case 1:
 
@@ -326,14 +405,14 @@ void MoveMonsters(float fElapsedTime)
 									PlayWavSound(monster_list[i].syell, monster_list[i].volume);
 							}
 
-							SetMonsterAnimationSequence(i, 8);
+							SetMonsterAnimationSequence(i, static_cast<int>(MonsterAnimSequence::ACTION_VARIANT1));
 							break;
 						case 2:
-							SetMonsterAnimationSequence(i, 9);
+							SetMonsterAnimationSequence(i, static_cast<int>(MonsterAnimSequence::TAUNT));
 							break;
 						case 3:
 
-							SetMonsterAnimationSequence(i, 10);
+							SetMonsterAnimationSequence(i, static_cast<int>(MonsterAnimSequence::WAVE));
 							break;
 						case 4:
 
@@ -344,7 +423,7 @@ void MoveMonsters(float fElapsedTime)
 									PlayWavSound(monster_list[i].syell, monster_list[i].volume);
 							}
 
-							SetMonsterAnimationSequence(i, 11);
+							SetMonsterAnimationSequence(i, static_cast<int>(MonsterAnimSequence::POINT));
 							break;
 						case 5:
 							break;
@@ -352,17 +431,16 @@ void MoveMonsters(float fElapsedTime)
 					}
 				}
 
-				if (monster_list[i].current_sequence == 1 || monster_list[i].current_sequence == 0)
+				if (monster_list[i].current_sequence == static_cast<int>(MonsterAnimSequence::WALK) || monster_list[i].current_sequence == static_cast<int>(MonsterAnimSequence::IDLE))
 				{
 
 					if (monster_list[i].attackspeed == 0)
-						SetMonsterAnimationSequence(i, 2);
+						SetMonsterAnimationSequence(i, static_cast<int>(MonsterAnimSequence::ATTACK));
 				}
-				if (monster_list[i].current_sequence == 2 && monster_list[i].current_frame == 53)
+				if (monster_list[i].current_sequence == static_cast<int>(MonsterAnimSequence::ATTACK) && monster_list[i].current_frame == 53)
 				{
 
 					monster_list[i].attackspeed = 0;
-
 				}
 
 
@@ -381,7 +459,8 @@ void MoveMonsters(float fElapsedTime)
 					int monsteron = 0;
 
 					monsteron = CalculateViewMonster(work2, work1, cullAngle, monster_list[i].rot_angle);
-					if (monster_list[i].current_sequence != 5 && monsteron && monster_list[i].dist <= 200.0f)
+					// Assuming sequence 5 was PAIN3. If it was another "don't attack while in this state" sequence, adjust.
+					if (monster_list[i].current_sequence != static_cast<int>(MonsterAnimSequence::PAIN3) && monsteron && monster_list[i].dist <= 200.0f)
 					{
 
 						int action = random_num(20) + 1;
@@ -405,40 +484,40 @@ void MoveMonsters(float fElapsedTime)
 			else
 			{
 
-				if (monster_list[i].current_sequence == 0)
+				if (monster_list[i].current_sequence == static_cast<int>(MonsterAnimSequence::IDLE))
 				{
 
 					raction = random_num(20);
-					if (monster_list[i].ability != 6 && monster_list[i].ability != 7 && monster_list[i].ability != 8)
+					if (monster_list[i].ability != 6 && monster_list[i].ability != 7 && monster_list[i].ability != 8) // Assuming these are special ability states not covered by basic anims
 					{
 
 						switch (raction)
 						{
 						case 0:
-							SetMonsterAnimationSequence(i, 7);// flip
+							SetMonsterAnimationSequence(i, static_cast<int>(MonsterAnimSequence::FLIP));
 							PlayWavSound(monster_list[i].syell, monster_list[i].volume);
 
 							break;
 						case 1:
-							SetMonsterAnimationSequence(i, 8);
+							SetMonsterAnimationSequence(i, static_cast<int>(MonsterAnimSequence::ACTION_VARIANT1));
 							break;
 						case 2:
-							SetMonsterAnimationSequence(i, 9);// Taunt
+							SetMonsterAnimationSequence(i, static_cast<int>(MonsterAnimSequence::TAUNT));
 							PlayWavSound(monster_list[i].syell, monster_list[i].volume);
 
 							break;
 						case 3:
-							SetMonsterAnimationSequence(i, 10);// Wave
+							SetMonsterAnimationSequence(i, static_cast<int>(MonsterAnimSequence::WAVE));
 							break;
 						case 4:
-							SetMonsterAnimationSequence(i, 11);// Point
+							SetMonsterAnimationSequence(i, static_cast<int>(MonsterAnimSequence::POINT));
 							PlayWavSound(monster_list[i].syell, monster_list[i].volume);
 							break;
 						case 5:
-							SetMonsterAnimationSequence(i, 0);
+							SetMonsterAnimationSequence(i, static_cast<int>(MonsterAnimSequence::IDLE));
 							break;
 						default:
-							SetMonsterAnimationSequence(i, 1);
+							SetMonsterAnimationSequence(i, static_cast<int>(MonsterAnimSequence::WALK));
 							break;
 						}
 					}
@@ -506,7 +585,7 @@ void MoveMonsters(float fElapsedTime)
 				}
 			}
 
-			if (monster_list[i].current_sequence != 1)
+			if (monster_list[i].current_sequence != static_cast<int>(MonsterAnimSequence::WALK))
 			{
 				skipmonster = 1;
 			}
@@ -535,10 +614,10 @@ void MoveMonsters(float fElapsedTime)
 				fDot = 180.0f + (180.0f - fDot);
 			}
 
-			if (monster_list[i].ability == 4)
+			if (monster_list[i].ability == 4) // statue ability
 			{
 				monster_list[i].current_frame = 0;
-				monster_list[i].current_sequence = 0;
+				monster_list[i].current_sequence = static_cast<int>(MonsterAnimSequence::IDLE); // Set to idle if statue
 				skipmonster = 1;
 			}
 			else
@@ -615,7 +694,7 @@ void MoveMonsters(float fElapsedTime)
 			}
 
 
-			if (monster_list[i].current_sequence == 1)
+			if (monster_list[i].current_sequence == static_cast<int>(MonsterAnimSequence::WALK))
 			{
 				XMFLOAT3 vfinal;
 
@@ -2039,11 +2118,11 @@ void MonsterHit()
 
 	int hitplayer = 0;
 
-	if (player_list[trueplayernum].current_sequence != 2) {
+	if (player_list[trueplayernum].current_sequence != static_cast<int>(PlayerAnimSequence::ATTACK)) {
 		damageinprogress = 0;
 	}
 
-	if (player_list[trueplayernum].current_frame >= 50 && player_list[trueplayernum].current_frame <= 50 && !damageinprogress)
+	if (player_list[trueplayernum].current_frame >= 50 && player_list[trueplayernum].current_frame <= 50 && !damageinprogress) // Assuming frame 50 is attack hit frame
 	{
 		damageinprogress = 1;
 		action = random_num(dice[0].sides) + 1;
@@ -2089,10 +2168,12 @@ void MonsterHit()
 					player_list[trueplayernum].thaco - monster_list[i].ac,
 					monster_list[i].health, savehp);
 
-				if (monster_list[i].current_sequence != 5 &&
-					monster_list[i].current_frame != 183 &&
-					monster_list[i].current_frame != 189 &&
-					monster_list[i].current_frame != 197 && monster_list[i].health > 0)
+                // Assuming sequence 5 for monster was a PAIN state or some other non-damageable state.
+                // And frames 183, 189, 197 are death frames.
+				if (monster_list[i].current_sequence != static_cast<int>(MonsterAnimSequence::PAIN3) && // Example, adjust if 5 meant something else
+					monster_list[i].current_frame != 183 && // MONSTER_FRAME_DEATH_STOP1
+					monster_list[i].current_frame != 189 && // MONSTER_FRAME_DEATH_STOP2
+					monster_list[i].current_frame != 197 && monster_list[i].health > 0) // MONSTER_FRAME_DEATH_STOP3
 				{
 					if (monster_list[i].dist < lastdist && monster_list[i].bIsPlayerAlive == TRUE &&
 						strcmp(monster_list[i].rname, "SLAVE") != 0 &&
@@ -2152,7 +2233,8 @@ void MonsterHit()
 			int monsteron = 0;
 
 			monsteron = CalculateView(m_vEyePt, work1, 45.0f, false);
-			if (player_list[trueplayernum].current_sequence != 5 && monsteron)
+            // Assuming player sequence 5 was a pain state or similar non-attacking state.
+			if (player_list[trueplayernum].current_sequence != static_cast<int>(PlayerAnimSequence::PAIN3) && monsteron)
 			{
 
 				action = random_num(dice[0].sides) + 1;
@@ -2192,8 +2274,9 @@ void MonsterHit()
 
 					damageroll = action;
 
-					int painaction = random_num(3);
-					SetMonsterAnimationSequence(i, 3 + painaction);
+					int painaction = random_num(3); // 0, 1, or 2
+                    // This will set PAIN1, PAIN2, or PAIN3
+					SetMonsterAnimationSequence(i, static_cast<int>(static_cast<MonsterAnimSequence>(static_cast<int>(MonsterAnimSequence::PAIN1) + painaction)));
 
 					dice[1].roll = 0;
 					sprintf_s(dice[1].name, "%ss%d", dice[1].prefix, action);
@@ -2258,9 +2341,9 @@ void MonsterHit()
 						}
 						PlayWavSound(monster_list[i].sdie, 100);
 
-						int deathaction = random_num(3);
-
-						SetMonsterAnimationSequence(i, 12 + deathaction);
+						int deathaction = random_num(3); // 0, 1, or 2
+                        // This will set DEATH1, DEATH2, or DEATH3
+						SetMonsterAnimationSequence(i, static_cast<int>(static_cast<MonsterAnimSequence>(static_cast<int>(MonsterAnimSequence::DEATH1) + deathaction)));
 						monster_list[i].bIsPlayerAlive = FALSE;
 						monster_list[i].bIsPlayerValid = FALSE;
 						monster_list[i].health = 0;
@@ -2754,13 +2837,13 @@ void ApplyPlayerDamage(int playerid, int damage)
 	{
 
 	case 0:
-		SetPlayerAnimationSequence(trueplayernum, 3);// pain1
+		SetPlayerAnimationSequence(trueplayernum, static_cast<int>(PlayerAnimSequence::PAIN1));
 		break;
 	case 1:
-		SetPlayerAnimationSequence(trueplayernum, 4);// pain2
+		SetPlayerAnimationSequence(trueplayernum, static_cast<int>(PlayerAnimSequence::PAIN2));
 		break;
 	case 2:
-		SetPlayerAnimationSequence(trueplayernum, 5);// pain3
+		SetPlayerAnimationSequence(trueplayernum, static_cast<int>(PlayerAnimSequence::PAIN3));
 		break;
 	}
 
@@ -2770,16 +2853,16 @@ void ApplyPlayerDamage(int playerid, int damage)
 
 		//raction = (int)random_num(3);
 
-		//switch (raction)
+		//switch (raction) // This was commented out, but if used, would be:
 		//{
 		//case 0:
-		//	SetPlayerAnimationSequence(trueplayernum, 12); // death1
+		//	SetPlayerAnimationSequence(trueplayernum, static_cast<int>(PlayerAnimSequence::DEATH1));
 		//	break;
 		//case 1:
-		//	SetPlayerAnimationSequence(trueplayernum, 13);// death2
+		//	SetPlayerAnimationSequence(trueplayernum, static_cast<int>(PlayerAnimSequence::DEATH2));
 		//	break;
 		//case 2:
-		//	SetPlayerAnimationSequence(trueplayernum, 14);// death3
+		//	SetPlayerAnimationSequence(trueplayernum, static_cast<int>(PlayerAnimSequence::DEATH3));
 		//	break;
 		//}
 
@@ -3661,73 +3744,68 @@ int XpPoints(int hd, int hp)
 
 int LevelUp(int xp)
 {
-    int countlevels = 0;
+    if (level_thresholds.empty()) {
+        InitializeLevelThresholds(); // Ensure thresholds are loaded
+    }
 
-    if (xp > 0 && xp <= 2000) countlevels = 1;
-    else if (xp <= 4000) countlevels = 2;
-    else if (xp <= 8000) countlevels = 3;
-    else if (xp <= 18000) countlevels = 4;
-    else if (xp <= 35000) countlevels = 5;
-    else if (xp <= 70000) countlevels = 6;
-    else if (xp <= 125000) countlevels = 7;
-    else if (xp <= 250000) countlevels = 8;
-    else if (xp <= 500000) countlevels = 9;
-    else if (xp <= 750000) countlevels = 10;
-    else if (xp <= 1000000) countlevels = 11;
-    else if (xp <= 1250000) countlevels = 12;
-    else if (xp <= 1500000) countlevels = 13;
-    else if (xp <= 1750000) countlevels = 14;
-    else if (xp <= 2000000) countlevels = 15;
-    else if (xp <= 2250000) countlevels = 16;
-    else if (xp <= 2500000) countlevels = 17;
-    else if (xp <= 2750000) countlevels = 18;
-    else if (xp <= 3000000) countlevels = 19;
-    else if (xp <= 3250000) countlevels = 20;
-    else if (xp <= 3500000) countlevels = 21;
-    else if (xp <= 3750000) countlevels = 22;
-    else if (xp <= 4000000) countlevels = 23;
-    else if (xp <= 4250000) countlevels = 24;
-    else if (xp <= 4500000) countlevels = 25;
-    else if (xp <= 4750000) countlevels = 26;
-    else if (xp <= 5000000) countlevels = 27;
-    else if (xp <= 5250000) countlevels = 28;
-    else if (xp <= 5500000) countlevels = 29;
-    else if (xp <= 5750000) countlevels = 30;
-    else if (xp <= 6000000) countlevels = 31;
-    else if (xp <= 6250000) countlevels = 32;
-    else if (xp <= 6500000) countlevels = 33;
-    else if (xp <= 6750000) countlevels = 34;
-    else if (xp <= 7000000) countlevels = 35;
-    else if (xp <= 7250000) countlevels = 36;
-    else if (xp <= 7500000) countlevels = 37;
-    else if (xp <= 7750000) countlevels = 38;
-    else if (xp <= 8000000) countlevels = 39;
-    else if (xp <= 8250000) countlevels = 40;
-    else if (xp <= 8500000) countlevels = 41;
-    else if (xp <= 8750000) countlevels = 42;
-    else if (xp <= 9000000) countlevels = 43;
-    else if (xp <= 9250000) countlevels = 44;
-    else if (xp <= 9500000) countlevels = 45;
-    else if (xp <= 9750000) countlevels = 46;
-    else if (xp <= 10000000) countlevels = 47;
-    else if (xp <= 10250000) countlevels = 48;
-    else if (xp <= 10500000) countlevels = 49;
-    else if (xp <= 10750000) countlevels = 50;
-    else if (xp <= 11000000) countlevels = 51;
-    else if (xp <= 11250000) countlevels = 52;
-    else if (xp <= 11500000) countlevels = 53;
-    else if (xp <= 11750000) countlevels = 54;
-    else if (xp <= 12000000) countlevels = 55;
-    else if (xp <= 12250000) countlevels = 56;
-    else if (xp <= 12500000) countlevels = 57;
-    else if (xp <= 12750000) countlevels = 58;
-    else if (xp <= 13000000) countlevels = 59;
-    else if (xp <= 13250000) countlevels = 60;
-    else if (xp <= 13500000) countlevels = 61;
+    int new_level = player_list[trueplayernum].hd; // Start with current level
 
-    if (player_list[trueplayernum].hd < countlevels)
+    // Find the highest level the player has achieved based on XP
+    for (size_t i = 0; i < level_thresholds.size() -1; ++i) { // -1 to avoid going out of bounds with level_thresholds[i+1]
+        if (xp > level_thresholds[i].xp_threshold && xp <= level_thresholds[i+1].xp_threshold) {
+            new_level = level_thresholds[i+1].level;
+            break;
+        }
+        // If XP is higher than the last defined threshold, it's the max level in the current table
+        if (xp > level_thresholds[level_thresholds.size() - 2].xp_threshold) { // Check against the second to last threshold
+             new_level = level_thresholds[level_thresholds.size() - 1].level; // Assign the max level
+             break;
+        }
+    }
+
+    // If current HD is less than the new_level determined by XP, then level up
+    if (player_list[trueplayernum].hd < new_level)
     {
-        player_list[trueplayernum].hd++;
+        // Level up for each level gained
+        while(player_list[trueplayernum].hd < new_level) {
+            player_list[trueplayernum].hd++;
+            int raction = random_num(20) + 1;
+            if (raction <= player_list[trueplayernum].hd) // Ensure HP gain is at least current HD
+                raction = player_list[trueplayernum].hd;
+
+            player_list[trueplayernum].hp += raction;
+            player_list[trueplayernum].health = player_list[trueplayernum].hp; // Fully heal on level up
+            player_list[trueplayernum].thaco--;
+
+            if (player_list[trueplayernum].thaco <= 0) // Ensure THACO doesn't go below a minimum
+                player_list[trueplayernum].thaco = 5;
+
+            sprintf_s(gActionMessage, "You went up a level.  Hit Dice: %d", player_list[trueplayernum].hd);
+            UpdateScrollList(255, 0, 255);
+            PlayWavSound(SoundID("win"), 100);
+        }
+    }
+
+    return xp;
+}
+
+int LevelUpXPNeeded(int xp)
+{
+    if (level_thresholds.empty()) {
+        InitializeLevelThresholds(); // Ensure thresholds are loaded
+    }
+
+    // Find the current level based on XP to determine the next XP threshold
+    int current_level_xp_index = 0;
+    for (size_t i = 0; i < level_thresholds.size() -1; ++i) {
+        if (xp >= level_thresholds[i].xp_threshold && xp < level_thresholds[i+1].xp_threshold) {
+            current_level_xp_index = i + 1; // Next threshold is at i+1
+            return level_thresholds[current_level_xp_index].xp_threshold;
+        }
+    }
+    // If XP is beyond the defined thresholds, return the last threshold (or a max value)
+    return level_thresholds.back().xp_threshold;
+}
 
         int raction = random_num(20) + 1;
         if (raction <= player_list[trueplayernum].hd)
@@ -3748,70 +3826,7 @@ int LevelUp(int xp)
     return xp;
 }
 
-int LevelUpXPNeeded(int xp)
-{
-    if (xp <= 2000) return 2000;
-    if (xp <= 4000) return 4000;
-    if (xp <= 8000) return 8000;
-    if (xp <= 18000) return 18000;
-    if (xp <= 35000) return 35000;
-    if (xp <= 70000) return 70000;
-    if (xp <= 125000) return 125000;
-    if (xp <= 250000) return 250000;
-    if (xp <= 500000) return 500000;
-    if (xp <= 750000) return 750000;
-    if (xp <= 1000000) return 1000000;
-    if (xp <= 1250000) return 1250000;
-    if (xp <= 1500000) return 1500000;
-    if (xp <= 1750000) return 1750000;
-    if (xp <= 2000000) return 2000000;
-    if (xp <= 2250000) return 2250000;
-    if (xp <= 2500000) return 2500000;
-    if (xp <= 2750000) return 2750000;
-    if (xp <= 3000000) return 3000000;
-    if (xp <= 3250000) return 3250000;
-    if (xp <= 3500000) return 3500000;
-    if (xp <= 3750000) return 3750000;
-    if (xp <= 4000000) return 4000000;
-    if (xp <= 4250000) return 4250000;
-    if (xp <= 4500000) return 4500000;
-    if (xp <= 4750000) return 4750000;
-    if (xp <= 5000000) return 5000000;
-    if (xp <= 5250000) return 5250000;
-    if (xp <= 5500000) return 5500000;
-    if (xp <= 5750000) return 5750000;
-    if (xp <= 6000000) return 6000000;
-    if (xp <= 6250000) return 6250000;
-    if (xp <= 6500000) return 6500000;
-    if (xp <= 6750000) return 6750000;
-    if (xp <= 7000000) return 7000000;
-    if (xp <= 7250000) return 7250000;
-    if (xp <= 7500000) return 7500000;
-    if (xp <= 7750000) return 7750000;
-    if (xp <= 8000000) return 8000000;
-    if (xp <= 8250000) return 8250000;
-    if (xp <= 8500000) return 8500000;
-    if (xp <= 8750000) return 8750000;
-    if (xp <= 9000000) return 9000000;
-    if (xp <= 9250000) return 9250000;
-    if (xp <= 9500000) return 9500000;
-    if (xp <= 9750000) return 9750000;
-    if (xp <= 10000000) return 10000000;
-    if (xp <= 10250000) return 10250000;
-    if (xp <= 10500000) return 10500000;
-    if (xp <= 10750000) return 10750000;
-    if (xp <= 11000000) return 11000000;
-    if (xp <= 11250000) return 11250000;
-    if (xp <= 11500000) return 11500000;
-    if (xp <= 11750000) return 11750000;
-    if (xp <= 12000000) return 12000000;
-    if (xp <= 12250000) return 12250000;
-    if (xp <= 12500000) return 12500000;
-    if (xp <= 12750000) return 12750000;
-    if (xp <= 13000000) return 13000000;
-    if (xp <= 13250000) return 13250000;
-    return 13500000;
-}
+// Removed the old LevelUpXPNeeded as it's replaced by the refactored version above.
 
 void statusbardisplay(float x, float length, int type)
 {

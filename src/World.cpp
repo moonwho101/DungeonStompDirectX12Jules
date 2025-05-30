@@ -6,6 +6,7 @@
 #include "DirectInput.hpp"
 #include "GameLogic.hpp"
 #include "Missle.hpp"
+#include "AnimationEnums.hpp" // Added for animation enums
 
 int endc = 0;
 
@@ -601,14 +602,20 @@ void SetPlayerAnimationSequence(int player_number, int sequence_number)
 
 	player_list[player_number].current_sequence = sequence_number;
 	model_id = player_list[player_number].model_id;
-	player_list[player_number].animationdir = 0;
+	player_list[player_number].animationdir = 0; // Reset animation direction
 
 	start_frame = pmdata[model_id].sequence_start_frame[sequence_number];
 
-	if (start_frame == 66)
+    // Special handling for a specific sequence (likely JUMP_FALL based on frame numbers)
+    // This assumes sequence PlayerAnimSequence::JUMP_FALL (value 6) has start_frame 66 in pmdata
+    // and is intended to sometimes play in reverse or from a different point (frame 70).
+	if (sequence_number == static_cast<int>(PlayerAnimSequence::JUMP_FALL) && start_frame == 66) // Check if it's the specific jump/fall sequence being set
 	{
+		// This logic seems to imply that if the JUMP_FALL sequence (6) is set
+        // and its default start frame is 66, it should instead start from 70 and play in reverse.
+        // This specific hardcoded frame number (66, 70) logic is retained as it's specific to model data.
 		start_frame = 70;
-		player_list[player_number].animationdir = 1;
+		player_list[player_number].animationdir = 1; // Play in reverse
 	}
 	player_list[player_number].current_frame = start_frame;
 
@@ -662,17 +669,18 @@ HRESULT AnimateCharacters()
 
 							if (runflag == 1 && jump == 0)
 							{
-								SetPlayerAnimationSequence(i, 1);
+								SetPlayerAnimationSequence(i, static_cast<int>(PlayerAnimSequence::WALK_RUN));
 							}
 							else if (runflag == 1 && jump == 1)
 							{
+								// In jump, likely stays in JUMP_FALL or a dedicated jump animation
 							}
 							else
 							{
-								SetPlayerAnimationSequence(i, 0);
+								SetPlayerAnimationSequence(i, static_cast<int>(PlayerAnimSequence::IDLE));
 							}
 						}
-						else
+						else // For other players (if multiplayer was fully implemented)
 						{
 
 							//SetPlayerAnimationSequence(i, 0);
@@ -687,51 +695,58 @@ HRESULT AnimateCharacters()
 						player_list[i].bStopAnimating = TRUE;
 					}
 
-					if (i == trueplayernum && curr_seq == 1 && runflag == 1)
+                    // If current sequence was WALK_RUN and player is still running, continue WALK_RUN
+					if (i == trueplayernum && curr_seq == static_cast<int>(PlayerAnimSequence::WALK_RUN) && runflag == 1)
 					{
+						// Already in WALK_RUN and should continue, do nothing to override SetPlayerAnimationSequence below
 					}
 					else
 					{
-						if (curr_seq == 0 || curr_seq == 1 || curr_seq == 6)
+                        // For IDLE, WALK_RUN, or JUMP_FALL sequences, determine next state
+						if (curr_seq == static_cast<int>(PlayerAnimSequence::IDLE) ||
+                            curr_seq == static_cast<int>(PlayerAnimSequence::WALK_RUN) ||
+                            curr_seq == static_cast<int>(PlayerAnimSequence::JUMP_FALL))
 						{
-							if (i == trueplayernum && curr_seq == 0 && jump == 0)
+                            // If player is currently IDLE and not jumping, potentially switch to a random idle animation or stay IDLE
+							if (i == trueplayernum && curr_seq == static_cast<int>(PlayerAnimSequence::IDLE) && jump == 0)
 							{
-
-								//TODO:Remove
-								SetPlayerAnimationSequence(i, 0);
-
-								int raction = random_num(8);
-
-								//if (raction == 0)
-								//	SetPlayerAnimationSequence(i, 7);// flip
-								//else if (raction == 1)
-								//	SetPlayerAnimationSequence(i, 8);// Salute
-								//else if (raction == 2)
-								//	SetPlayerAnimationSequence(i, 9);// Taunt
-								//else if (raction == 3)
-								//	SetPlayerAnimationSequence(i, 10);// Wave
-								//else if (raction == 4)
-								//	SetPlayerAnimationSequence(i, 11); // Point
-								//else
-								//	SetPlayerAnimationSequence(i, 0);
-
+								SetPlayerAnimationSequence(i, static_cast<int>(PlayerAnimSequence::IDLE));
+                                // The commented-out section for random idle animations:
+								// int raction = random_num(8);
+								// if (raction == 0) SetPlayerAnimationSequence(i, static_cast<int>(PlayerAnimSequence::FLIP));
+								// else if (raction == 1) SetPlayerAnimationSequence(i, static_cast<int>(PlayerAnimSequence::SALUTE));
+								// else if (raction == 2) SetPlayerAnimationSequence(i, static_cast<int>(PlayerAnimSequence::TAUNT));
+								// else if (raction == 3) SetPlayerAnimationSequence(i, static_cast<int>(PlayerAnimSequence::WAVE));
+								// else if (raction == 4) SetPlayerAnimationSequence(i, static_cast<int>(PlayerAnimSequence::POINT));
+								// else SetPlayerAnimationSequence(i, static_cast<int>(PlayerAnimSequence::IDLE));
 							}
+                            // If not one of the above specific conditions, and not jumping, default to IDLE or WALK_RUN based on runflag
+                            else if (i == trueplayernum && jump == 0) {
+                                if (runflag == 1) {
+                                    SetPlayerAnimationSequence(i, static_cast<int>(PlayerAnimSequence::WALK_RUN));
+                                } else {
+                                    SetPlayerAnimationSequence(i, static_cast<int>(PlayerAnimSequence::IDLE));
+                                }
+                            }
+                            // If jumping, likely managed by jump logic or remains in JUMP_FALL
 						}
-						else
+						else // For other sequences (like ATTACK, PAIN) that finish
 						{
+                            // Default to IDLE or WALK_RUN based on runflag if not jumping
 							if (runflag == 1 && i == trueplayernum && jump == 0)
 							{
-								SetPlayerAnimationSequence(i, 1);
+								SetPlayerAnimationSequence(i, static_cast<int>(PlayerAnimSequence::WALK_RUN));
 							}
 							else
 							{
 								if (i == trueplayernum && jump == 1)
 								{
+									// If jumping, current sequence might be JUMP_FALL or specific jump animation
+                                    // No change here means it continues its current jump/fall animation
 								}
-								else {
-									SetPlayerAnimationSequence(i, 0);
+								else { // Not jumping, default to IDLE
+									SetPlayerAnimationSequence(i, static_cast<int>(PlayerAnimSequence::IDLE));
 								}
-
 							}
 						}
 					}
@@ -771,22 +786,44 @@ HRESULT AnimateCharacters()
 				if (curr_frame >= stop_frame)
 				{
 					curr_seq = monster_list[i].current_sequence;
-					monster_list[i].current_frame = pmdata[mod_id].sequence_stop_frame[curr_seq];
-					//monster_list[i].animationdir = 1;
+                    // When a sequence finishes, monster usually goes to IDLE.
+                    // The original code set current_frame to sequence_stop_frame then called SetMonsterAnimationSequence(i, 0)
+                    // which would then set current_frame to sequence_start_frame[0].
+                    // This effectively means upon sequence completion, they go to the start of IDLE.
+					monster_list[i].current_frame = pmdata[mod_id].sequence_start_frame[static_cast<int>(MonsterAnimSequence::IDLE)];
+					SetMonsterAnimationSequence(i, static_cast<int>(MonsterAnimSequence::IDLE));
 
-					SetMonsterAnimationSequence(i, 0);
-
-					if (monster_list[i].current_frame == 183 || monster_list[i].current_frame == 189 || monster_list[i].current_frame == 197)
+                    // Check for specific death frames to stop animation permanently
+					if (curr_frame == 183 || curr_frame == 189 || curr_frame == 197) // MONSTER_FRAME_DEATH_STOP1 etc.
 					{
 						monster_list[i].bStopAnimating = TRUE;
+                        // Ensure it stays in a death sequence if that's what 183 etc. implies
+                        if (curr_seq == static_cast<int>(MonsterAnimSequence::DEATH1) ||
+                            curr_seq == static_cast<int>(MonsterAnimSequence::DEATH2) ||
+                            curr_seq == static_cast<int>(MonsterAnimSequence::DEATH3)) {
+                            monster_list[i].current_sequence = curr_seq; // Keep it in the death sequence
+                            monster_list[i].current_frame = stop_frame; // Stay at the end of the death anim
+                        }
 					}
 				}
-				else
+				else // Frame is not at stop_frame yet
 				{
-					if (monster_list[i].current_frame != 183 || monster_list[i].current_frame != 189 || monster_list[i].current_frame != 197)
+                    // Only advance frame if not a terminal death frame that should stop animation
+					if (!(monster_list[i].current_frame == 183 ||
+                          monster_list[i].current_frame == 189 ||
+                          monster_list[i].current_frame == 197))
 					{
 						monster_list[i].current_frame++;
-					}
+					} else {
+                        // If it IS one of the death stop frames, ensure bStopAnimating is true
+                        // and it remains in the death sequence.
+                        monster_list[i].bStopAnimating = TRUE;
+                        if (curr_seq == static_cast<int>(MonsterAnimSequence::DEATH1) ||
+                            curr_seq == static_cast<int>(MonsterAnimSequence::DEATH2) ||
+                            curr_seq == static_cast<int>(MonsterAnimSequence::DEATH3)) {
+                            monster_list[i].current_sequence = curr_seq;
+                        }
+                    }
 				}
 			}
 			else

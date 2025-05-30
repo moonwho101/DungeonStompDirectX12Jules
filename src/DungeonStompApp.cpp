@@ -424,6 +424,37 @@ void DungeonStompApp::OnMouseMove(WPARAM btnState, int x, int y)
 	//mLastMousePos.y = y;
 }
 
+// Helper function to handle toggle keys
+void DungeonStompApp::HandleToggleKey(char keyCode, bool& featureFlag, bool& keyPressFlag, const char* featureName,
+                                     void(*onEnable)() /*= nullptr*/, void(*onDisable)() /*= nullptr*/)
+{
+    if (GetAsyncKeyState(keyCode) && !keyPressFlag)
+    {
+        featureFlag = !featureFlag;
+        if (featureFlag)
+        {
+            if (onEnable) onEnable();
+            sprintf_s(gActionMessage, "%s Enabled", featureName);
+        }
+        else
+        {
+            if (onDisable) onDisable();
+            sprintf_s(gActionMessage, "%s Disabled", featureName);
+        }
+        UpdateScrollList(0, 255, 255); // Common color for these messages
+    }
+
+    if (GetAsyncKeyState(keyCode))
+    {
+        keyPressFlag = true;
+    }
+    else
+    {
+        keyPressFlag = false;
+    }
+}
+
+
 void DungeonStompApp::OnKeyboardInput(const GameTimer& gt)
 {
 	//rise from the dead
@@ -440,103 +471,44 @@ void DungeonStompApp::OnKeyboardInput(const GameTimer& gt)
 			displayShadowMap = 0;
 		else
 			displayShadowMap = 1;
+        // Note: Shadow map toggle does not use gActionMessage or UpdateScrollList in the original code
 	}
 
 	if (GetAsyncKeyState('M')) {
-		displayShadowMapKeyPress = 1;
+		displayShadowMapKeyPress = true;
 	}
 	else {
-		displayShadowMapKeyPress = 0;
+		displayShadowMapKeyPress = false;
 	}
 
+    HandleToggleKey('O', enableSSao, enableSSaoKey, "SSAO");
+    HandleToggleKey('B', enableCameraBob, enableCameraBobKey, "Camera bob");
+    HandleToggleKey('V', enableVsync, enableVsyncKey, "VSync");
 
-	if (GetAsyncKeyState('O') && !enableSSaoKey) {
-
-		if (enableSSao) {
-			enableSSao = 0;
-			strcpy_s(gActionMessage, "SSAO Disabled");
-			UpdateScrollList(0, 255, 255);
-		}
-		else {
-			strcpy_s(gActionMessage, "SSAO Enabled");
-			UpdateScrollList(0, 255, 255);
-			enableSSao = 1;
-		}
-	}
-
-	if (GetAsyncKeyState('O')) {
-		enableSSaoKey = 1;
-	}
-	else {
-		enableSSaoKey = 0;
-	}
-
-
-	if (GetAsyncKeyState('B') && !enableCameraBobKey) {
-
-		if (enableCameraBob) {
-			enableCameraBob = false;
-			strcpy_s(gActionMessage, "Camera bob Disabled");
-			UpdateScrollList(0, 255, 255);
-		}
-		else {
-			strcpy_s(gActionMessage, "Camera bob Enabled");
-			UpdateScrollList(0, 255, 255);
-			enableCameraBob = true;
-		}
-	}
-
-	if (GetAsyncKeyState('B')) {
-		enableCameraBobKey = 1;
-	}
-	else {
-		enableCameraBobKey = 0;
-	}
-	
-	if (GetAsyncKeyState('N') && !enableNormalmapKey) {
-
-		if (enableNormalmap) {
-			enableNormalmap = false;
-			SetTextureNormalMapEmpty();
-			strcpy_s(gActionMessage, "Normal map Disabled");
-			UpdateScrollList(0, 255, 255);
-		}
-		else {
-			SetTextureNormalMap();
-			strcpy_s(gActionMessage, "Normal map Enabled");
-			UpdateScrollList(0, 255, 255);
-			enableNormalmap = true;
-		}
-	}
-
-	if (GetAsyncKeyState('N')) {
-		enableNormalmapKey = 1;
-	}
-	else {
-		enableNormalmapKey = 0;
-	}
-
-
-	if (GetAsyncKeyState('V') && !enableVsyncKey) {
-
-		if (enableVsync) {
-			enableVsync = false;
-			strcpy_s(gActionMessage, "VSync Disabled");
-			UpdateScrollList(0, 255, 255);
-		}
-		else {
-			strcpy_s(gActionMessage, "VSync Enabled");
-			UpdateScrollList(0, 255, 255);
-			enableVsync = true;
-		}
-	}
-
-	if (GetAsyncKeyState('V')) {
-		enableVsyncKey = 1;
-	}
-	else {
-		enableVsyncKey = 0;
-	}
+    // Special handling for Normal Map due to SetTextureNormalMapEmpty/SetTextureNormalMap calls
+    if (GetAsyncKeyState('N') && !enableNormalmapKey)
+    {
+        enableNormalmap = !enableNormalmap;
+        if (enableNormalmap)
+        {
+            SetTextureNormalMap();
+            sprintf_s(gActionMessage, "Normal map Enabled");
+        }
+        else
+        {
+            SetTextureNormalMapEmpty();
+            sprintf_s(gActionMessage, "Normal map Disabled");
+        }
+        UpdateScrollList(0, 255, 255);
+    }
+    if (GetAsyncKeyState('N'))
+    {
+        enableNormalmapKey = true;
+    }
+    else
+    {
+        enableNormalmapKey = false;
+    }
 
 
 }
