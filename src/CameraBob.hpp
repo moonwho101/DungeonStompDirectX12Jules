@@ -6,29 +6,27 @@ class CameraBob {
 private:
     float x = 0;
     float y = 0;
-    float s = 0;
-    float a = 0;
-    float f = 0;
+    float speed_ = 0;
+    float amplitude_ = 0;
+    float frequency_ = 0;
 
 public:
 
-    CameraBob() {
-
-    }
+    CameraBob() = default;
 
     void SinWave(float speed, float amplitude, float frequency);
     void update(float delta);
-    float CameraBob::getX();
+    float getX();
 
-    float CameraBob::getY();
-    float CameraBob::getSpeed();
-    float CameraBob::getAmplitude();
-    float CameraBob::getFrequency();
-    void CameraBob::setX(float x2);
-    void CameraBob::setY(float y1);
-    void CameraBob::setSpeed(float speed);
-    void CameraBob::setAmplitude(float amplitude);
-    void CameraBob::setFrequency(float frequency);
+    float getY();
+    float getSpeed();
+    float getAmplitude();
+    float getFrequency();
+    void setX(float x2);
+    void setY(float y1);
+    void setSpeed(float speed);
+    void setAmplitude(float amplitude);
+    void setFrequency(float frequency);
 };
 
 #endif // CAMERABOB_H

@@ -5,14 +5,14 @@
 void CameraBob::SinWave(float speed, float amplitude, float frequency) {
     x = 0;
     y = 0;
-    s = speed;
-    a = amplitude;
-    f = frequency;
+    speed_ = speed;
+    amplitude_ = amplitude;
+    frequency_ = frequency;
 }
 
 void CameraBob::update(float delta) {
-    x += s * delta;
-    y = (float)(a * sin(x * f));
+    x += speed_ * delta;
+    y = (float)(amplitude_ * sin(x * frequency_));
 }
 
 float CameraBob::getX() {
@@ -22,13 +22,13 @@ float CameraBob::getY() {
     return y;
 }
 float CameraBob::getSpeed() {
-    return s;
+    return speed_;
 }
 float CameraBob::getAmplitude() {
-    return a;
+    return amplitude_;
 }
 float CameraBob::getFrequency() {
-    return f;
+    return frequency_;
 }
 
 void CameraBob::setX(float x2) {
@@ -38,13 +38,13 @@ void CameraBob::setY(float y1) {
     y = y1;
 }
 void CameraBob::setSpeed(float speed) {
-    s = speed;
+    speed_ = speed;
 }
 void CameraBob::setAmplitude(float amplitude) {
-    a = amplitude;
+    amplitude_ = amplitude;
 }
 void CameraBob::setFrequency(float frequency) {
-    f = frequency;
+    frequency_ = frequency;
 }
 
 
