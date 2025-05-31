@@ -2,6 +2,7 @@
 #include <io.h>
 #include <fcntl.h>
 #include <windows.h>
+#include <float.h> // Added for FLT_MAX
 #include "world.hpp"
 #include "ImportMD2.hpp"
 
@@ -196,6 +197,47 @@ BOOL ImportMD2_GLCMD(char* filename, int texture_alias,int pmodel_id, float scal
 	pmdata[pmodel_id].sky = (float)1 / header.skinheight;
 	pmdata[pmodel_id].num_frames = header.num_frames;
 	pmdata[pmodel_id].use_indexed_primitive = FALSE;
+
+	// Calculate Local AABB for the base frame (frame 0)
+	if (header.num_frames > 0 && header.num_verts > 0)
+	{
+		pmdata[pmodel_id].localAABB.min.x = FLT_MAX;
+		pmdata[pmodel_id].localAABB.min.y = FLT_MAX;
+		pmdata[pmodel_id].localAABB.min.z = FLT_MAX;
+
+		pmdata[pmodel_id].localAABB.max.x = -FLT_MAX;
+		pmdata[pmodel_id].localAABB.max.y = -FLT_MAX;
+		pmdata[pmodel_id].localAABB.max.z = -FLT_MAX;
+
+		for (j = 0; j < header.num_verts; j++)
+		{
+			// Min
+			if (pmdata[pmodel_id].w[0][j].x < pmdata[pmodel_id].localAABB.min.x)
+				pmdata[pmodel_id].localAABB.min.x = pmdata[pmodel_id].w[0][j].x;
+			if (pmdata[pmodel_id].w[0][j].y < pmdata[pmodel_id].localAABB.min.y)
+				pmdata[pmodel_id].localAABB.min.y = pmdata[pmodel_id].w[0][j].y;
+			if (pmdata[pmodel_id].w[0][j].z < pmdata[pmodel_id].localAABB.min.z)
+				pmdata[pmodel_id].localAABB.min.z = pmdata[pmodel_id].w[0][j].z;
+
+			// Max
+			if (pmdata[pmodel_id].w[0][j].x > pmdata[pmodel_id].localAABB.max.x)
+				pmdata[pmodel_id].localAABB.max.x = pmdata[pmodel_id].w[0][j].x;
+			if (pmdata[pmodel_id].w[0][j].y > pmdata[pmodel_id].localAABB.max.y)
+				pmdata[pmodel_id].localAABB.max.y = pmdata[pmodel_id].w[0][j].y;
+			if (pmdata[pmodel_id].w[0][j].z > pmdata[pmodel_id].localAABB.max.z)
+				pmdata[pmodel_id].localAABB.max.z = pmdata[pmodel_id].w[0][j].z;
+		}
+	}
+	else
+	{
+		// Default AABB if no vertices or frames
+		pmdata[pmodel_id].localAABB.min.x = 0.0f;
+		pmdata[pmodel_id].localAABB.min.y = 0.0f;
+		pmdata[pmodel_id].localAABB.min.z = 0.0f;
+		pmdata[pmodel_id].localAABB.max.x = 0.0f;
+		pmdata[pmodel_id].localAABB.max.y = 0.0f;
+		pmdata[pmodel_id].localAABB.max.z = 0.0f;
+	}
 
 	return TRUE;
 }

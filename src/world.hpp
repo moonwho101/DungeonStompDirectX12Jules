@@ -34,6 +34,12 @@ typedef struct CUSTOMVERTEXTEST
 #endif
 } CUSTOMVERT;
 
+typedef struct BoundingBox_typ
+{
+    DirectX::XMFLOAT3 min;
+    DirectX::XMFLOAT3 max;
+} BoundingBox;
+
 typedef struct texturemapping_typ
 {
 	float tu[4];
@@ -279,6 +285,11 @@ typedef struct pmdata_typ
 	float sky;
 	float scale;
 	char name[256];
+	BoundingBox localAABB;
+
+	D3DVERTEX2* processed_base_vertices; // For pre-processed indexed models (3DS)
+	int num_processed_base_vertices;     // Number of vertices in the above array
+	// bool is_base_preprocessed; // Can be inferred if processed_base_vertices != nullptr
 
 } PLAYERMODELDATA, * pmdata_ptr;
 
@@ -305,6 +316,11 @@ typedef struct objectdata_typ
 	int hp;
 	int damage;
 	int shadow = 0;
+	BoundingBox localAABB;
+
+	D3DVERTEX2* processed_vertices;
+	int num_processed_vertices;
+	bool is_preprocessed;
 
 } OBJECTDATA, * objectdata_ptr;
 typedef struct modellistdisplay

@@ -670,212 +670,104 @@ XMFLOAT3 RadiusMultiply(XMFLOAT3  eRadius, XMFLOAT3 vector) {
 	return result;
 }
 
-int CalculateView(XMFLOAT3 EyeBall, XMFLOAT3 LookPoint, float angle, bool distancecheck)
+int CalculateView(XMFLOAT3 EyeBall, XMFLOAT3 LookPoint, float view_cone_half_angle_degrees, bool distancecheck)
 {
+    int monsteron = 0;
 
-	XMFLOAT3 vw1, vw2, work2, work1;// vDiff, normroadold;
-	float fDot;
-	float convangle;
-	float anglework = 0;
-	int monsteron = 0;
+    if (distancecheck) {
+        // Calculate qdist: distance between EyeBall and LookPoint projected on XZ plane for this specific check.
+        // The original code uses full 3D distance for this. Let's keep it consistent.
+        float qdist = FastDistance(EyeBall.x - LookPoint.x, EyeBall.y - LookPoint.y, EyeBall.z - LookPoint.z);
+        if (qdist < 1170.0f) {
+            // This distance check seems to be an override or a wider initial check.
+            // If it's meant to be a preliminary check before the cone, it should be here.
+            // If it's an alternative condition for monsteron=1, its placement is also fine.
+            return 1; // monsteron = 1; return monsteron;
+        }
+    }
 
-	if (distancecheck) {
-		float qdist = FastDistance(EyeBall.x - LookPoint.x, EyeBall.y - LookPoint.y,
-			EyeBall.z - LookPoint.z);
+    // Vector from eye to the point, normalized
+    XMVECTOR vEye = XMLoadFloat3(&EyeBall);
+    XMVECTOR vLookPoint = XMLoadFloat3(&LookPoint);
+    XMVECTOR dir_to_lookpoint = XMVector3Normalize(vLookPoint - vEye);
 
-		if (qdist < 1170.0f) {
-			monsteron = 1;
-			return monsteron;
-		}
-	}
+    // Player's forward vector (based on global 'angy')
+    // angy = 0 seems to be along +Z, increasing clockwise.
+    // Forward vector: (sin(angy*k), 0, cos(angy*k))
+    float player_forward_x = sinf(angy * k); // k is XM_PI / 180.0f
+    float player_forward_z = cosf(angy * k);
+    XMVECTOR player_forward_vec = XMVector3Normalize(XMVectorSet(player_forward_x, 0.0f, player_forward_z, 0.0f));
 
-	work2.x = EyeBall.x;
-	work2.y = EyeBall.y;
-	work2.z = EyeBall.z;
+    // Cosine of the half angle of the view cone
+    float cos_half_angle = cosf(view_cone_half_angle_degrees * k);
 
-	work1.x = LookPoint.x;
-	work1.y = LookPoint.y;
-	work1.z = LookPoint.z;
-	XMVECTOR vDiff = XMLoadFloat3(&work1) - XMLoadFloat3(&work2);
+    // Dot product
+    // We are interested in the angle on the XZ plane primarily for 'angy' based view.
+    // So, project dir_to_lookpoint onto XZ plane before dot product if angy is purely XZ.
+    // However, if view_cone_half_angle_degrees implies a 3D cone, then use 3D vectors.
+    // The original code's complex calculation implies XZ plane. Let's stick to XZ for player forward.
+    // For dir_to_lookpoint, if we want a true 3D cone, we should use its 3D form.
+    // If the original comparison was effectively 2D (XZ plane), we should project dir_to_lookpoint too.
+    // Given the player_forward_vec is on XZ, let's project dir_to_lookpoint to XZ for consistency.
 
-	//D3DXVec3Normalize(&vDiff, &vDiff);
-	vDiff = XMVector3Normalize(vDiff);
+    XMVECTOR dir_to_lookpoint_xz = XMVectorSet(XMVectorGetX(dir_to_lookpoint), 0.0f, XMVectorGetZ(dir_to_lookpoint), 0.0f);
+    dir_to_lookpoint_xz = XMVector3Normalize(dir_to_lookpoint_xz);
 
 
-	vw1.x = work1.x;
-	vw1.y = (float)0;
-	vw1.z = work1.z;
+    float dot_product = XMVectorGetX(XMVector3Dot(dir_to_lookpoint_xz, player_forward_vec));
 
-	vw2.x = work2.x;
-	vw2.y = (float)0;
-	vw2.z = work2.z;
+    if (dot_product > cos_half_angle) {
+        monsteron = 1;
+    } else {
+        monsteron = 0;
+    }
 
-	vDiff = XMLoadFloat3(&vw1) - XMLoadFloat3(&vw2);
-
-	XMVECTOR normroadold = XMVectorSet(50, 0, 0, 0);
-
-	//normroadold.x = 50;
-	//normroadold.y = 0;
-	//normroadold.z = 0;
-
-	//D3DXVec3Normalize(&final, &vDiff);
-	XMVECTOR r1 = XMVector3Normalize(vDiff);
-	XMVECTOR r2 = XMVector3Normalize(normroadold);
-
-	//D3DXVec3Normalize(&final2, &normroadold);
-	//fDot = D3DXVec3Dot(&final, &final2);
-
-	fDot = XMVectorGetX(XMVector3Dot(r1, r2));
-
-	convangle = (float)acos(fDot) / k;
-
-	fDot = convangle;
-
-	if (vw2.z < vw1.z)
-	{
-	}
-	else
-	{
-		fDot = (180.0f + (180.0f - fDot));
-	}
-
-	fDot = (360.00f) - fDot;
-
-	anglework = fixangle(fDot, +90.0f);
-
-	if (angy + angle >= 360.0f)
-	{
-		if (anglework <= fixangle(angy, +angle) && anglework >= 0.0f)
-		{
-			monsteron = 1;
-		}
-		if (anglework >= fixangle(angy, -angle) && anglework <= 360.0f)
-		{
-			monsteron = 1;
-		}
-	}
-	else if (angy - angle <= 0.0f)
-	{
-		if (anglework <= fixangle(angy, +angle) && anglework >= 0.0f)
-		{
-			monsteron = 1;
-		}
-		if (anglework >= fixangle(angy, -angle) && anglework <= 360.0f)
-		{
-			monsteron = 1;
-		}
-	}
-	else
-	{
-
-		if (anglework <= fixangle(angy, +angle) && anglework >= fixangle(angy, -angle))
-			monsteron = 1;
-	}
-
-	return monsteron;
+    return monsteron;
 }
 
-int CalculateViewMonster(XMFLOAT3 EyeBall, XMFLOAT3 LookPoint, float angle, float angy)
+int CalculateViewMonster(XMFLOAT3 EyeBall, XMFLOAT3 LookPoint, float view_cone_half_angle_degrees, float angy_monster)
 {
+    int monsteron = 0;
 
-	XMFLOAT3 vw1, vw2, work2, work1;//, vDiff, normroadold;
-	float fDot;
-	float convangle;
-	float anglework = 0;
-	int monsteron = 0;
+    // Vector from eye to the point, normalized
+    XMVECTOR vEye = XMLoadFloat3(&EyeBall);
+    XMVECTOR vLookPoint = XMLoadFloat3(&LookPoint);
+    XMVECTOR dir_to_lookpoint = XMVector3Normalize(vLookPoint - vEye);
 
-	work2.x = EyeBall.x;
-	work2.y = EyeBall.y;
-	work2.z = EyeBall.z;
+    // Monster's forward vector (based on 'angy_monster' parameter)
+    // Assuming angy_monster follows the same convention as global angy (0 degrees = +Z, clockwise)
+    // Forward vector: (sin(angy_monster*k), 0, cos(angy_monster*k))
+    float monster_forward_x = sinf(angy_monster * k); // k is XM_PI / 180.0f
+    float monster_forward_z = cosf(angy_monster * k);
+    XMVECTOR monster_forward_vec = XMVector3Normalize(XMVectorSet(monster_forward_x, 0.0f, monster_forward_z, 0.0f));
 
-	work1.x = LookPoint.x;
-	work1.y = LookPoint.y;
-	work1.z = LookPoint.z;
-	//vDiff = work1 - work2;
+    // Cosine of the half angle of the view cone
+    float cos_half_angle = cosf(view_cone_half_angle_degrees * k);
 
-	XMVECTOR vDiff = XMLoadFloat3(&work1) - XMLoadFloat3(&work2);
-
-	//D3DXVec3Normalize(&vDiff, &vDiff);
-	vDiff = XMVector3Normalize(vDiff);
-	//D3DXVec3Normalize(&vDiff, &vDiff);
-
-	//vDiff = Normalize(vDiff);
-
-	vw1.x = work1.x;
-	vw1.y = (float)0;
-	vw1.z = work1.z;
-
-	vw2.x = work2.x;
-	vw2.y = (float)0;
-	vw2.z = work2.z;
-
-	//vDiff = vw1 - vw2;
-
-	vDiff = XMLoadFloat3(&vw1) - XMLoadFloat3(&vw2);
-	XMVECTOR normroadold = XMVectorSet(50, 0, 0, 0);
-	//D3DXVec3Normalize(&final, &vDiff);
-
-	//final = Normalize(vDiff);
-	//D3DXVec3Normalize(&final2, &normroadold);
-	//final2 = Normalize(normroadold);
-	//fDot = D3DXVec3Dot(&final, &final2);
+    // Dot product
+    // Project dir_to_lookpoint onto XZ plane for consistency with XZ-plane based monster_forward_vec
+    XMVECTOR dir_to_lookpoint_xz = XMVectorSet(XMVectorGetX(dir_to_lookpoint), 0.0f, XMVectorGetZ(dir_to_lookpoint), 0.0f);
+    // Only normalize if it's not a zero vector (which happens if LookPoint is directly above/below EyeBall)
+    if (XMVectorGetX(XMVector3LengthSq(dir_to_lookpoint_xz)) > 1e-6f) { // Check if length is not zero
+        dir_to_lookpoint_xz = XMVector3Normalize(dir_to_lookpoint_xz);
+    } else {
+        // If dir_to_lookpoint_xz is (0,0,0), dot product will be 0.
+        // This means LookPoint is directly above/below EyeBall.
+        // Depending on desired behavior, monsteron could be 0 or 1.
+        // For now, if it's directly above/below, it's not "in front" on XZ.
+        dir_to_lookpoint_xz = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f); // Ensure it's zero if no XZ component
+    }
 
 
-	XMVECTOR r1 = XMVector3Normalize(vDiff);
-	XMVECTOR r2 = XMVector3Normalize(normroadold);
+    float dot_product = XMVectorGetX(XMVector3Dot(dir_to_lookpoint_xz, monster_forward_vec));
 
-	//D3DXVec3Normalize(&final2, &normroadold);
-	//fDot = D3DXVec3Dot(&final, &final2);
+    if (dot_product > cos_half_angle) {
+        monsteron = 1;
+    } else {
+        monsteron = 0;
+    }
 
-	fDot = XMVectorGetX(XMVector3Dot(r1, r2));
-
-
-	//fDot = dot(final, final2);
-
-	convangle = (float)acos(fDot) / k;
-
-	fDot = convangle;
-
-	if (vw2.z < vw1.z)
-	{
-	}
-	else
-	{
-		fDot = (180.0f + (180.0f - fDot));
-	}
-
-	anglework = fDot;
-
-	if (angy + angle >= 360.0f)
-	{
-		if (anglework <= fixangle(angy, +angle) && anglework >= 0.0f)
-		{
-			monsteron = 1;
-		}
-		if (anglework >= fixangle(angy, -angle) && anglework <= 360.0f)
-		{
-			monsteron = 1;
-		}
-	}
-	else if (angy - angle <= 0.0f)
-	{
-		if (anglework <= fixangle(angy, +angle) && anglework >= 0.0f)
-		{
-			monsteron = 1;
-		}
-		if (anglework >= fixangle(angy, -angle) && anglework <= 360.0f)
-		{
-			monsteron = 1;
-		}
-	}
-	else
-	{
-
-		if (anglework <= fixangle(angy, +angle) && anglework >= fixangle(angy, -angle))
-			monsteron = 1;
-	}
-
-	return monsteron;
+    return monsteron;
 }
 
 void WakeUpMonsters()
@@ -1099,8 +991,8 @@ int SceneInBox(D3DVECTOR point)
 	pntx = point.x;
 	pnty = point.z;
 
-	xx = m_vLookatPt.x;
-	zz = m_vLookatPt.z;
+	xx = m_vEyePt.x;
+	zz = m_vEyePt.z;
 
 	mx[0] = xx + (xp[0] * cosine - yp[0] * sine);
 	mz[0] = zz + (xp[0] * sine + yp[0] * cosine);
@@ -1511,128 +1403,171 @@ void MakeBoundingBox()
 
 void PlayerNonIndexedBox(int pmodel_id, int curr_frame, int angle, float wx, float wy, float wz)
 {
-	int i, j;
-	int num_verts_per_poly;
-	int num_poly;
-	int i_count;
-	short v_index;
-	float x, y, z;
-	float rx, ry, rz;
-	float tx, ty;
-	int count_v;
-
-	float min_x, min_y, min_z;
-	float max_x, max_y, max_z;
-
-	float x_off = 0;
-	float y_off = 0;
-	float z_off = 0;
-
-	min_x = wx;
-	min_y = wy;
-	min_z = wz;
-	max_x = wx;
-	max_y = wy;
-	max_z = wz;
-
-	vert_ptr tp;
-
-	D3DPRIMITIVETYPE p_command;
-	BOOL error = TRUE;
-
-	if (angle >= 360)
-		angle = angle - 360;
-	if (angle < 0)
-		angle += 360;
-
-	//float cosine = cos_table[angle];
-	//float sine = sin_table[angle];
-
-	float cosine = (float)cos(angle * k);
-	float sine = (float)sin(angle * k);
-
-	if (curr_frame >= pmdata[pmodel_id].num_frames)
-		curr_frame = 0;
-
-	i_count = 0;
-
-	num_poly = pmdata[pmodel_id].num_polys_per_frame;
-
-	for (i = 0; i < num_poly; i++)
+	// Validate pmodel_id and AABB
+	if (pmodel_id < 0 || pmodel_id >= MAX_PLAYERS_OLD) // Assuming MAX_PLAYERS_OLD is the size of pmdata, adjust if different
 	{
-		p_command = pmdata[pmodel_id].poly_cmd[i];
-		num_verts_per_poly = pmdata[pmodel_id].num_vert[i];
-
-		count_v = 0;
-
-		for (j = 0; j < num_verts_per_poly; j++)
-		{
-			v_index = pmdata[pmodel_id].f[i_count];
-
-			tp = &pmdata[pmodel_id].w[curr_frame][v_index];
-			x = tp->x + x_off;
-			z = tp->y + y_off;
-			y = tp->z + z_off;
-
-			rx = wx + (x * cosine - z * sine);
-			ry = wy + y;
-			rz = wz + (x * sine + z * cosine);
-
-			tx = pmdata[pmodel_id].t[i_count].x * pmdata[pmodel_id].skx;
-			ty = pmdata[pmodel_id].t[i_count].y * pmdata[pmodel_id].sky;
-			if (D3DVAL(rx) > max_x)
-				max_x = D3DVAL(rx);
-			if (D3DVAL(rx) < min_x)
-				min_x = D3DVAL(rx);
-
-			if (D3DVAL(ry) > max_y)
-				max_y = D3DVAL(ry);
-			if (D3DVAL(ry) < min_y)
-				min_y = D3DVAL(ry);
-
-			if (D3DVAL(rz) > max_z)
-				max_z = D3DVAL(rz);
-			if (D3DVAL(rz) < min_z)
-				min_z = D3DVAL(rz);
-
-			i_count++;
-		}
+		// Handle invalid pmodel_id, perhaps log an error or skip
+		return;
 	}
 
-	float objectheight = max_y - min_y;
-	float objectx = max_x - min_x;
-	float objectz = max_z - min_z;
-	float objecty = max_y - min_y;
+	BoundingBox localAABB = pmdata[pmodel_id].localAABB;
 
-	if (objectx > 80.0f || objectz > 80.0f)
+	// Check for zero-volume AABB (or uninitialized)
+	if (localAABB.min.x == localAABB.max.x || localAABB.min.y == localAABB.max.y || localAABB.min.z == localAABB.max.z)
 	{
-		objectx = 35.0f;
-	}
-	else
-	{
-		objectx = 20.0f;
-	}
-
-	float objecttrueheight = objectheight;
-	if (objectheight < 150.0f)
-	{
-		objectheight = 50.0f;
-	}
-	else
-	{
-		objectheight = 70.0f;
+		// Handle zero-volume AABB: create a small default box around wx, wy, wz or skip
+		// For now, let's use a small default box of size 10x10x10 centered at the object
+		float halfSize = 5.0f;
+		localAABB.min.x = -halfSize; localAABB.min.y = -halfSize; localAABB.min.z = -halfSize;
+		localAABB.max.x = halfSize;  localAABB.max.y = halfSize;  localAABB.max.z = halfSize;
+        // And transform this default box as if it were centered at origin, then move to wx,wy,wz
 	}
 
-	min_x = wx - objectx;
-	max_x = wx + objectx;
+	// Create world transformation matrix
+	XMMATRIX worldMatrix = XMMatrixRotationY(angle * (XM_PI / 180.0f)) * XMMatrixTranslation(wx, wy, wz);
 
-	min_y = wy - objecty / 2;
-	max_y = wy + objecty / 2;
+	// Define the 8 corners of the local AABB
+	XMFLOAT3 corners[8];
+	corners[0] = XMFLOAT3(localAABB.min.x, localAABB.min.y, localAABB.min.z); // ---
+	corners[1] = XMFLOAT3(localAABB.max.x, localAABB.min.y, localAABB.min.z); // +--
+	corners[2] = XMFLOAT3(localAABB.min.x, localAABB.max.y, localAABB.min.z); // -+-
+	corners[3] = XMFLOAT3(localAABB.max.x, localAABB.max.y, localAABB.min.z); // ++-
+	corners[4] = XMFLOAT3(localAABB.min.x, localAABB.min.y, localAABB.max.z); // --+
+	corners[5] = XMFLOAT3(localAABB.max.x, localAABB.min.y, localAABB.max.z); // +-+
+	corners[6] = XMFLOAT3(localAABB.min.x, localAABB.max.y, localAABB.max.z); // -++
+	corners[7] = XMFLOAT3(localAABB.max.x, localAABB.max.y, localAABB.max.z); // +++
 
-	min_z = wz - objectx;
-	max_z = wz + objectx;
+	// Transform these 8 corners to world space
+	XMFLOAT3 transformedCorners[8];
+	for (int i = 0; i < 8; ++i)
+	{
+		XMVECTOR cornerVec = XMLoadFloat3(&corners[i]);
+		XMVECTOR transformedVec = XMVector3TransformCoord(cornerVec, worldMatrix);
+		XMStoreFloat3(&transformedCorners[i], transformedVec);
+	}
 
-	boundingbox[countboundingbox].x = max_x;
+	// Find the new min and max coordinates from the 8 transformed world-space corners
+	XMFLOAT3 worldMin = transformedCorners[0];
+	XMFLOAT3 worldMax = transformedCorners[0];
+
+	for (int i = 1; i < 8; ++i)
+	{
+		worldMin.x = min(worldMin.x, transformedCorners[i].x);
+		worldMin.y = min(worldMin.y, transformedCorners[i].y);
+		worldMin.z = min(worldMin.z, transformedCorners[i].z);
+
+		worldMax.x = max(worldMax.x, transformedCorners[i].x);
+		worldMax.y = max(worldMax.y, transformedCorners[i].y);
+		worldMax.z = max(worldMax.z, transformedCorners[i].z);
+	}
+
+	// Populate the boundingbox array using the new worldMin and worldMax
+	// This replicates the structure of the original code's 5 faces.
+	// Face 1 (Top: +Y)
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMin.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMin.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+
+	// Face 2 (Front: +Z)
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMin.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMin.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+
+	// Face 3 (Back: -Z)
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMin.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMin.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMin.y;
+	boundingbox[countboundingbox].z = worldMin.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMin.y;
+	boundingbox[countboundingbox].z = worldMin.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+
+	// Face 4 (Right: +X)
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMin.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMin.y;
+	boundingbox[countboundingbox].z = worldMin.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMin.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+
+	// Face 5 (Left: -X)
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMin.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMin.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 1;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMin.x;
 	boundingbox[countboundingbox].y = max_y;
 	boundingbox[countboundingbox].z = min_z;
 	boundingbox[countboundingbox].monster = 1;
@@ -1640,141 +1575,9 @@ void PlayerNonIndexedBox(int pmodel_id, int curr_frame, int angle, float wx, flo
 	countboundingbox++;
 
 	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = min_z;
+	boundingbox[countboundingbox].y = worldMin.y;
+	boundingbox[countboundingbox].z = worldMin.z;
 	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = max_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = max_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-
-	//2nd
-
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = max_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = max_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = min_y;
-	boundingbox[countboundingbox].z = max_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = min_y;
-	boundingbox[countboundingbox].z = max_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-
-	//3rd
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = min_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = min_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = min_y;
-	boundingbox[countboundingbox].z = min_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = min_y;
-	boundingbox[countboundingbox].z = min_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-
-	//4th
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = min_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = max_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = min_y;
-	boundingbox[countboundingbox].z = min_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = min_y;
-	boundingbox[countboundingbox].z = max_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-
-	//5th
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = max_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = min_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = min_y;
-	boundingbox[countboundingbox].z = max_z;
-	boundingbox[countboundingbox].monster = 1;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = min_y;
-	boundingbox[countboundingbox].z = min_z;
-	boundingbox[countboundingbox].monster = 1;
-
 	countboundingbox++;
 
 	return;
@@ -1782,243 +1585,173 @@ void PlayerNonIndexedBox(int pmodel_id, int curr_frame, int angle, float wx, flo
 
 void PlayerIndexedBox(int pmodel_id, int curr_frame, int angle, float wx, float wy, float wz)
 {
-	int i, j;
-	int num_verts_per_poly;
-	int num_faces_per_poly;
-	int num_poly;
-	int poly_command;
-	int i_count, face_i_count;
-	float x, y, z;
-	float rx, ry, rz;
-	float tx, ty;
-	int count_v = 0;
-
-	float min_x, min_y, min_z;
-	float max_x, max_y, max_z;
-
-	float x_off = 0;
-	float y_off = 0;
-	float z_off = 0;
-
-	min_x = wx;
-	min_y = wy;
-	min_z = wz;
-	max_x = wx;
-	max_y = wy;
-	max_z = wz;
-
-	if (curr_frame >= pmdata[pmodel_id].num_frames)
-		curr_frame = 0;
-
-	curr_frame = 0;
-	//float cosine = cos_table[angle];
-	//float sine = sin_table[angle];
-
-	float cosine = (float)cos(angle * k);
-	float sine = (float)sin(angle * k);
-
-	i_count = 0;
-	face_i_count = 0;
-
-	//	if(rendering_first_frame == TRUE)
-	//		fp = fopen("ds.txt","a");
-
-	// process and transfer the model data from the pmdata structure
-	// to the array of D3DVERTEX2 structures, src_v
-
-	num_poly = pmdata[pmodel_id].num_polys_per_frame;
-
-	for (i = 0; i < num_poly; i++)
+	// Validate pmodel_id and AABB
+	if (pmodel_id < 0 || pmodel_id >= MAX_PLAYERS_OLD) // Assuming MAX_PLAYERS_OLD is the size of pmdata, adjust if different
 	{
-		poly_command = pmdata[pmodel_id].poly_cmd[i];
-		num_verts_per_poly = pmdata[pmodel_id].num_verts_per_object[i];
-		num_faces_per_poly = pmdata[pmodel_id].num_faces_per_object[i];
-		count_v = 0;
-		for (j = 0; j < num_verts_per_poly; j++)
-		{
+		// Handle invalid pmodel_id, perhaps log an error or skip
+		return;
+	}
 
-			x = pmdata[pmodel_id].w[curr_frame][i_count].x + x_off;
-			z = pmdata[pmodel_id].w[curr_frame][i_count].y + y_off;
-			y = pmdata[pmodel_id].w[curr_frame][i_count].z + z_off;
+	BoundingBox localAABB = pmdata[pmodel_id].localAABB;
 
-			rx = wx + (x * cosine - z * sine);
-			ry = wy + y;
-			rz = wz + (x * sine + z * cosine);
+	// Check for zero-volume AABB (or uninitialized)
+	if (localAABB.min.x == localAABB.max.x || localAABB.min.y == localAABB.max.y || localAABB.min.z == localAABB.max.z)
+	{
+		// Handle zero-volume AABB: create a small default box around wx, wy, wz or skip
+		float halfSize = 5.0f; // Default half-size for the box
+		localAABB.min.x = -halfSize; localAABB.min.y = -halfSize; localAABB.min.z = -halfSize;
+		localAABB.max.x = halfSize;  localAABB.max.y = halfSize;  localAABB.max.z = halfSize;
+	}
 
-			tx = pmdata[pmodel_id].t[i_count].x * pmdata[pmodel_id].skx;
-			ty = pmdata[pmodel_id].t[i_count].y * pmdata[pmodel_id].sky;
+	// Create world transformation matrix
+	XMMATRIX worldMatrix = XMMatrixRotationY(angle * (XM_PI / 180.0f)) * XMMatrixTranslation(wx, wy, wz);
 
-			if (D3DVAL(rx) > max_x)
-				max_x = D3DVAL(rx);
-			if (D3DVAL(rx) < min_x)
-				min_x = D3DVAL(rx);
+	// Define the 8 corners of the local AABB
+	XMFLOAT3 corners[8];
+	corners[0] = XMFLOAT3(localAABB.min.x, localAABB.min.y, localAABB.min.z);
+	corners[1] = XMFLOAT3(localAABB.max.x, localAABB.min.y, localAABB.min.z);
+	corners[2] = XMFLOAT3(localAABB.min.x, localAABB.max.y, localAABB.min.z);
+	corners[3] = XMFLOAT3(localAABB.max.x, localAABB.max.y, localAABB.min.z);
+	corners[4] = XMFLOAT3(localAABB.min.x, localAABB.min.y, localAABB.max.z);
+	corners[5] = XMFLOAT3(localAABB.max.x, localAABB.min.y, localAABB.max.z);
+	corners[6] = XMFLOAT3(localAABB.min.x, localAABB.max.y, localAABB.max.z);
+	corners[7] = XMFLOAT3(localAABB.max.x, localAABB.max.y, localAABB.max.z);
 
-			if (D3DVAL(ry) > max_y)
-				max_y = D3DVAL(ry);
-			if (D3DVAL(ry) < min_y)
-				min_y = D3DVAL(ry);
+	// Transform these 8 corners to world space
+	XMFLOAT3 transformedCorners[8];
+	for (int i = 0; i < 8; ++i)
+	{
+		XMVECTOR cornerVec = XMLoadFloat3(&corners[i]);
+		XMVECTOR transformedVec = XMVector3TransformCoord(cornerVec, worldMatrix);
+		XMStoreFloat3(&transformedCorners[i], transformedVec);
+	}
 
-			if (D3DVAL(rz) > max_z)
-				max_z = D3DVAL(rz);
-			if (D3DVAL(rz) < min_z)
-				min_z = D3DVAL(rz);
+	// Find the new min and max coordinates from the 8 transformed world-space corners
+	XMFLOAT3 worldMin = transformedCorners[0];
+	XMFLOAT3 worldMax = transformedCorners[0];
 
-			i_count++;
+	for (int i = 1; i < 8; ++i)
+	{
+		worldMin.x = min(worldMin.x, transformedCorners[i].x);
+		worldMin.y = min(worldMin.y, transformedCorners[i].y);
+		worldMin.z = min(worldMin.z, transformedCorners[i].z);
 
-		} // end for j
+		worldMax.x = max(worldMax.x, transformedCorners[i].x);
+		worldMax.y = max(worldMax.y, transformedCorners[i].y);
+		worldMax.z = max(worldMax.z, transformedCorners[i].z);
+	}
 
-	} // end for vert_cnt
-
-	// got min & max make box
-
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = min_z;
+	// Populate the boundingbox array using the new worldMin and worldMax
+	// Replicates the structure of the original code's 5 faces.
+	// Face 1 (Top: +Y)
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMin.z;
 	boundingbox[countboundingbox].monster = 0;
-
-
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMin.z;
+	boundingbox[countboundingbox].monster = 0;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 0;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 0;
 	countboundingbox++;
 
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = min_z;
+	// Face 2 (Front: +Z)
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMax.z;
 	boundingbox[countboundingbox].monster = 0;
-
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 0;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMin.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 0;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMin.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 0;
 	countboundingbox++;
 
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = max_z;
+	// Face 3 (Back: -Z)
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMin.z;
 	boundingbox[countboundingbox].monster = 0;
-
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMin.z;
+	boundingbox[countboundingbox].monster = 0;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMin.y;
+	boundingbox[countboundingbox].z = worldMin.z;
+	boundingbox[countboundingbox].monster = 0;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMin.y;
+	boundingbox[countboundingbox].z = worldMin.z;
+	boundingbox[countboundingbox].monster = 0;
 	countboundingbox++;
 
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = max_z;
+	// Face 4 (Right: +X)
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMin.z;
 	boundingbox[countboundingbox].monster = 0;
-
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 0;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMin.y;
+	boundingbox[countboundingbox].z = worldMin.z;
+	boundingbox[countboundingbox].monster = 0;
+	countboundingbox++;
+	boundingbox[countboundingbox].x = worldMax.x;
+	boundingbox[countboundingbox].y = worldMin.y;
+	boundingbox[countboundingbox].z = worldMax.z;
+	boundingbox[countboundingbox].monster = 0;
 	countboundingbox++;
 
-	//2nd
-
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = max_z;
+	// Face 5 (Left: -X)
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMax.z;
 	boundingbox[countboundingbox].monster = 0;
-
 	countboundingbox++;
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = max_z;
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMax.y;
+	boundingbox[countboundingbox].z = worldMin.z;
 	boundingbox[countboundingbox].monster = 0;
-
 	countboundingbox++;
-
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = min_y;
-	boundingbox[countboundingbox].z = max_z;
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMin.y;
+	boundingbox[countboundingbox].z = worldMax.z;
 	boundingbox[countboundingbox].monster = 0;
-
 	countboundingbox++;
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = min_y;
-	boundingbox[countboundingbox].z = max_z;
+	boundingbox[countboundingbox].x = worldMin.x;
+	boundingbox[countboundingbox].y = worldMin.y;
+	boundingbox[countboundingbox].z = worldMin.z;
 	boundingbox[countboundingbox].monster = 0;
-
 	countboundingbox++;
-
-	//3rd
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = min_z;
-	boundingbox[countboundingbox].monster = 0;
-
-	countboundingbox++;
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = min_z;
-	boundingbox[countboundingbox].monster = 0;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = min_y;
-	boundingbox[countboundingbox].z = min_z;
-	boundingbox[countboundingbox].monster = 0;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = min_y;
-	boundingbox[countboundingbox].z = min_z;
-	boundingbox[countboundingbox].monster = 0;
-
-	countboundingbox++;
-
-	//4th
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = min_z;
-	boundingbox[countboundingbox].monster = 0;
-
-	countboundingbox++;
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = max_z;
-	boundingbox[countboundingbox].monster = 0;
-
-	countboundingbox++;
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = min_y;
-	boundingbox[countboundingbox].z = min_z;
-	boundingbox[countboundingbox].monster = 0;
-
-	countboundingbox++;
-	boundingbox[countboundingbox].x = max_x;
-	boundingbox[countboundingbox].y = min_y;
-	boundingbox[countboundingbox].z = max_z;
-	boundingbox[countboundingbox].monster = 0;
-
-	countboundingbox++;
-
-	//5th
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = max_z;
-	boundingbox[countboundingbox].monster = 0;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = max_y;
-	boundingbox[countboundingbox].z = min_z;
-	boundingbox[countboundingbox].monster = 0;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = min_y;
-	boundingbox[countboundingbox].z = max_z;
-	boundingbox[countboundingbox].monster = 0;
-
-	countboundingbox++;
-
-	boundingbox[countboundingbox].x = min_x;
-	boundingbox[countboundingbox].y = min_y;
-	boundingbox[countboundingbox].z = min_z;
-	boundingbox[countboundingbox].monster = 0;
-
-	countboundingbox++;
-
-	//objectheight = max_y - min_y;
-	//objectx = max_x - min_x;
-	//objectz = max_z - min_z;
-
 
 	return;
 }

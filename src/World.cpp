@@ -119,6 +119,13 @@ void InitDS()
 	src_f = new int[MAX_NUM_FACE_INDICES];
 	texture_list_buffer = new int[MAX_NUM_QUADS];
 	pmdata = new PLAYERMODELDATA[MAX_NUM_PMMODELS];
+	// Initialize new members for pmdata
+	for (int i = 0; i < MAX_NUM_PMMODELS; ++i)
+	{
+		pmdata[i].processed_base_vertices = nullptr;
+		pmdata[i].num_processed_base_vertices = 0;
+		// pmdata[i].is_base_preprocessed = false; // If this member were added
+	}
 	your_gun = new GUNLIST[MAX_NUM_GUNS];
 	model_list = new MODELLIST[MAX_NUM_PLAYERS];
 	monster_list = new PLAYER[MAX_NUM_MONSTERS];

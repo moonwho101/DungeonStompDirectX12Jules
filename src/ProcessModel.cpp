@@ -160,7 +160,106 @@ bool ObjectHasShadow(int object_id) {
 
 void ObjectToD3DVertList(int ob_type, float angle, int oblist_index)
 {
+    // Added pre-processing path
+    if (ob_type >= 0 && ob_type < obdata_length && obdata[ob_type].is_preprocessed && obdata[ob_type].processed_vertices != nullptr && obdata[ob_type].num_processed_vertices > 0)
+    {
+        float wx = oblist[oblist_index].x;
+        float wy = oblist[oblist_index].y;
+        float wz = oblist[oblist_index].z;
+        float cosine = (float)cos(angle * k); // k should be XM_PI / 180.0f
+        float sine = (float)sin(angle * k);
 
+        int start_cnt_for_object = cnt;
+
+        for (int i = 0; i < obdata[ob_type].num_processed_vertices; ++i)
+        {
+            if (cnt >= MAX_NUM_QUADS * 10) break; // Safety break for src_v buffer
+
+            const D3DVERTEX2* local_vert = &obdata[ob_type].processed_vertices[i];
+
+            // Transform position
+            float lx = local_vert->x;
+            float ly = local_vert->y;
+            float lz = local_vert->z;
+            src_v[cnt].x = wx + (lx * cosine - lz * sine);
+            src_v[cnt].y = wy + ly;
+            src_v[cnt].z = wz + (lx * sine + lz * cosine);
+
+            // Transform normal
+            float lnx = local_vert->nx;
+            float lny = local_vert->ny;
+            float lnz = local_vert->nz;
+            src_v[cnt].nx = (lnx * cosine - lnz * sine);
+            src_v[cnt].ny = lny;
+            src_v[cnt].nz = (lnx * sine + lnz * cosine);
+            // TODO: Normalize if necessary, though pre-processed normals should ideally be normalized.
+            // XMVECTOR n_vec = XMVector3Normalize(XMLoadFloat3(&XMFLOAT3(src_v[cnt].nx, src_v[cnt].ny, src_v[cnt].nz)));
+            // XMStoreFloat3((XMFLOAT3*)&src_v[cnt].nx, n_vec);
+
+
+            // Transform tangent (nmx, nmy, nmz)
+            float lnmx = local_vert->nmx;
+            float lnmy = local_vert->nmy;
+            float lnmz = local_vert->nmz;
+            src_v[cnt].nmx = (lnmx * cosine - lnmz * sine);
+            src_v[cnt].nmy = lnmy;
+            src_v[cnt].nmz = (lnmx * sine + lnmz * cosine);
+            // TODO: Normalize tangent if necessary.
+            // XMVECTOR tan_vec = XMVector3Normalize(XMLoadFloat3(&XMFLOAT3(src_v[cnt].nmx, src_v[cnt].nmy, src_v[cnt].nmz)));
+            // XMStoreFloat3((XMFLOAT3*)&src_v[cnt].nmx, tan_vec);
+
+            src_v[cnt].tu = local_vert->tu;
+            src_v[cnt].tv = local_vert->tv;
+
+            // Assuming objectcollide is a global relevant to the current context.
+            // This was not explicitly passed to PreProcessStaticObjectGeometry, so might need review.
+            src_collide[cnt] = (objectcollide == 1) ? 1 : 0;
+
+            cnt++;
+        }
+
+        if (obdata[ob_type].num_processed_vertices > 0 && number_of_polys_per_frame < MAX_NUM_QUADS) {
+            ObjectsToDraw[number_of_polys_per_frame].vertsperpoly = obdata[ob_type].num_processed_vertices;
+            ObjectsToDraw[number_of_polys_per_frame].srcstart = start_cnt_for_object;
+
+            int representative_texture_alias = obdata[ob_type].tex[0];
+            if (strstr(oblist[oblist_index].name, "!") != NULL) {
+                 representative_texture_alias = oblist[oblist_index].monstertexture;
+            }
+            ObjectsToDraw[number_of_polys_per_frame].texture = representative_texture_alias;
+            if (number_of_polys_per_frame < MAX_NUM_TEXTURES) { // Check against texture_list_buffer size
+                 texture_list_buffer[number_of_polys_per_frame] = representative_texture_alias;
+            }
+
+
+            ObjectsToDraw[number_of_polys_per_frame].objectId = ob_type;
+            ObjectsToDraw[number_of_polys_per_frame].castshaddow = oblist[oblist_index].castshadow;
+
+            float centroidx = wx;
+            float centroidy = wy;
+            float centroidz = wz;
+            // Ensure m_vEyePt is accessible here (it's global in GameLogic.cpp, might need extern here or pass as param)
+            // For now, assuming it's accessible as per original code context.
+            float q_dist = FastDistance(m_vEyePt.x - centroidx, m_vEyePt.y - centroidy, m_vEyePt.z - centroidz); // Renamed qdist
+            ObjectsToDraw[number_of_polys_per_frame].dist = q_dist;
+            ObjectsToDraw[number_of_polys_per_frame].vert_index = number_of_polys_per_frame;
+
+            dp_commands[number_of_polys_per_frame] = D3DPT_TRIANGLELIST;
+            dp_command_index_mode[number_of_polys_per_frame] = USE_NON_INDEXED_DP;
+
+            if (number_of_polys_per_frame < (sizeof(verts_per_poly)/sizeof(verts_per_poly[0])) ) {
+                 verts_per_poly[number_of_polys_per_frame] = obdata[ob_type].num_processed_vertices;
+            }
+
+            num_triangles_in_scene += obdata[ob_type].num_processed_vertices / 3;
+            num_verts_in_scene += obdata[ob_type].num_processed_vertices;
+            num_dp_commands_in_scene++;
+            number_of_polys_per_frame++;
+        }
+        return;
+    }
+
+    // Original function content starts here if not pre-processed
 	int ob_vert_count = 0;
 	int poly;
 	float qdist = 0;
@@ -1726,6 +1825,213 @@ int GetNextFramePlayer() {
 	
 }
 
+// Function to preprocess static object geometry into a unified triangle list
+void PreProcessStaticObjectGeometry(OBJECTDATA* obj_data)
+{
+    if (!obj_data || obj_data->is_preprocessed)
+    {
+        return; // Already processed or invalid data
+    }
+
+    // Step 1: Count total vertices needed after primitive conversion
+    int total_final_vertices = 0;
+    int object_index = obj_data - obdata; // Calculate index of current object
+
+    // Basic safety check for object_index against the bounds of num_polys_per_object
+    // This assumes num_polys_per_object is appropriately sized (e.g., MAX_OBJECTS or similar)
+    // and obdata_length reflects the valid range of objects.
+    if (object_index < 0 || object_index >= obdata_length /* Replace with actual max objects constant if available */ ) {
+        // Consider logging an error here
+        obj_data->is_preprocessed = true; // Mark to avoid retrying on invalid index
+        obj_data->processed_vertices = nullptr;
+        obj_data->num_processed_vertices = 0;
+        return;
+    }
+    // Additional check for num_polys_per_object array bounds specifically
+    // (Using a common size like 500 from its declaration, adjust if a MAX_OBJECT_TYPES constant exists)
+    if (object_index >= (sizeof(num_polys_per_object)/sizeof(num_polys_per_object[0])) ) {
+         obj_data->is_preprocessed = true;
+         obj_data->processed_vertices = nullptr;
+         obj_data->num_processed_vertices = 0;
+        return;
+    }
+
+
+    for (int i = 0; i < num_polys_per_object[object_index]; ++i)
+    {
+        int num_poly_verts = obj_data->num_vert[i]; // Vertices in this specific polygon command
+        D3DPRIMITIVETYPE prim_type = obj_data->poly_cmd[i];
+
+        if (prim_type == D3DPT_TRIANGLELIST)
+        {
+            total_final_vertices += num_poly_verts;
+        }
+        else if (prim_type == D3DPT_TRIANGLESTRIP || prim_type == D3DPT_TRIANGLEFAN)
+        {
+            if (num_poly_verts >= 3)
+            {
+                total_final_vertices += (num_poly_verts - 2) * 3; // Each strip/fan segment makes (N-2) triangles
+            }
+        }
+    }
+
+    if (total_final_vertices == 0) {
+        obj_data->processed_vertices = nullptr;
+        obj_data->num_processed_vertices = 0;
+        obj_data->is_preprocessed = true; // Mark as processed even if no verts
+        return;
+    }
+
+    obj_data->processed_vertices = new (std::nothrow) D3DVERTEX2[total_final_vertices];
+    if(!obj_data->processed_vertices) {
+        obj_data->num_processed_vertices = 0;
+        obj_data->is_preprocessed = false; // Allocation failed, not successfully preprocessed
+        // Consider logging an error
+        return;
+    }
+
+    int processed_v_idx = 0;        // Current index into obj_data->processed_vertices
+    int current_original_vert_index = 0; // Tracks progress through obj_data->v and obj_data->t
+
+    for (int poly_idx = 0; poly_idx < num_polys_per_object[object_index]; ++poly_idx)
+    {
+        int num_poly_verts = obj_data->num_vert[poly_idx]; // Vertices for *this* polygon primitive
+        D3DPRIMITIVETYPE prim_type = obj_data->poly_cmd[poly_idx];
+        int texture_idx = obj_data->tex[poly_idx];
+
+        // Temporarily store the original vertices for the current polygon/strip/fan
+        std::vector<D3DVERTEX2> current_poly_original_verts(num_poly_verts);
+        for(int k=0; k<num_poly_verts; ++k) {
+            current_poly_original_verts[k].x = obj_data->v[current_original_vert_index + k].x;
+            current_poly_original_verts[k].y = obj_data->v[current_original_vert_index + k].y;
+            current_poly_original_verts[k].z = obj_data->v[current_original_vert_index + k].z;
+
+            if(obj_data->use_texmap[poly_idx]) { // True means use TexMap global array
+                // TexMap stores UVs for quads typically. This needs careful mapping if original poly isn't a quad.
+                // Simplified: take first UV set from TexMap for the whole poly, or use k%4 if it's a quad.
+                // This part is tricky without knowing original quad structure if prim_type is list from quads.
+                int uv_map_idx = k % 4; // Assuming TexMap stores 4 UVs for a quad.
+                if (texture_idx >= 0 && texture_idx < MAX_NUM_TEXTURES) { // MAX_NUM_TEXTURES from world.hpp
+                    current_poly_original_verts[k].tu = TexMap[texture_idx].tu[uv_map_idx];
+                    current_poly_original_verts[k].tv = TexMap[texture_idx].tv[uv_map_idx];
+                } else {
+                    current_poly_original_verts[k].tu = 0.0f; current_poly_original_verts[k].tv = 0.0f; // Fallback
+                }
+            } else { // use_texmap is false, use per-vertex UVs from obj_data->t
+                current_poly_original_verts[k].tu = obj_data->t[current_original_vert_index + k].x;
+                current_poly_original_verts[k].tv = obj_data->t[current_original_vert_index + k].y;
+            }
+        }
+
+        if (prim_type == D3DPT_TRIANGLELIST)
+        {
+            for (int j = 0; j < num_poly_verts; j += 3)
+            {
+                if (j + 2 < num_poly_verts && (processed_v_idx + 2) < total_final_vertices)
+                {
+                    D3DVERTEX2 v0 = current_poly_original_verts[j];
+                    D3DVERTEX2 v1 = current_poly_original_verts[j+1];
+                    D3DVERTEX2 v2 = current_poly_original_verts[j+2];
+
+                    XMVECTOR p0 = XMLoadFloat3(&XMFLOAT3(v0.x, v0.y, v0.z));
+                    XMVECTOR p1 = XMLoadFloat3(&XMFLOAT3(v1.x, v1.y, v1.z));
+                    XMVECTOR p2 = XMLoadFloat3(&XMFLOAT3(v2.x, v2.y, v2.z));
+                    XMVECTOR edge1 = p1 - p0;
+                    XMVECTOR edge2 = p2 - p0;
+                    XMVECTOR normal = XMVector3Normalize(XMVector3Cross(edge1, edge2));
+                    XMFLOAT3 normalF; XMStoreFloat3(&normalF, normal);
+
+                    v0.nx = -normalF.x; v0.ny = -normalF.y; v0.nz = -normalF.z;
+                    v1.nx = -normalF.x; v1.ny = -normalF.y; v1.nz = -normalF.z;
+                    v2.nx = -normalF.x; v2.ny = -normalF.y; v2.nz = -normalF.z;
+
+                    CalculateTangentBinormal(v0, v1, v2);
+
+                    obj_data->processed_vertices[processed_v_idx++] = v0;
+                    obj_data->processed_vertices[processed_v_idx++] = v1;
+                    obj_data->processed_vertices[processed_v_idx++] = v2;
+                }
+            }
+        }
+        else if (prim_type == D3DPT_TRIANGLESTRIP)
+        {
+            if (num_poly_verts >=3) {
+                for (int j = 0; j < num_poly_verts - 2; ++j)
+                {
+                    if ((processed_v_idx + 2) >= total_final_vertices) break;
+
+                    D3DVERTEX2 v0, v1, v2;
+                    // Correct winding for triangle strips
+                    if ((j % 2) == 0)
+                    {
+                        v0 = current_poly_original_verts[j];
+                        v1 = current_poly_original_verts[j+1];
+                        v2 = current_poly_original_verts[j+2];
+                    }
+                    else
+                    {
+                        v0 = current_poly_original_verts[j+1]; // Swapped to maintain winding
+                        v1 = current_poly_original_verts[j];
+                        v2 = current_poly_original_verts[j+2];
+                    }
+
+                    XMVECTOR p0 = XMLoadFloat3(&XMFLOAT3(v0.x, v0.y, v0.z));
+                    XMVECTOR p1 = XMLoadFloat3(&XMFLOAT3(v1.x, v1.y, v1.z));
+                    XMVECTOR p2 = XMLoadFloat3(&XMFLOAT3(v2.x, v2.y, v2.z));
+                    XMVECTOR edge1 = p1 - p0;
+                    XMVECTOR edge2 = p2 - p0;
+                    XMVECTOR normal = XMVector3Normalize(XMVector3Cross(edge1, edge2));
+                    XMFLOAT3 normalF; XMStoreFloat3(&normalF, normal);
+
+                    v0.nx = -normalF.x; v0.ny = -normalF.y; v0.nz = -normalF.z;
+                    v1.nx = -normalF.x; v1.ny = -normalF.y; v1.nz = -normalF.z;
+                    v2.nx = -normalF.x; v2.ny = -normalF.y; v2.nz = -normalF.z;
+
+                    CalculateTangentBinormal(v0, v1, v2);
+
+                    obj_data->processed_vertices[processed_v_idx++] = v0;
+                    obj_data->processed_vertices[processed_v_idx++] = v1;
+                    obj_data->processed_vertices[processed_v_idx++] = v2;
+                }
+            }
+        }
+        else if (prim_type == D3DPT_TRIANGLEFAN)
+        {
+            if (num_poly_verts >=3) {
+                for (int j = 0; j < num_poly_verts - 2; ++j)
+                {
+                    if ((processed_v_idx + 2) >= total_final_vertices) break;
+
+                    D3DVERTEX2 v0 = current_poly_original_verts[0];
+                    D3DVERTEX2 v1 = current_poly_original_verts[j+1];
+                    D3DVERTEX2 v2 = current_poly_original_verts[j+2];
+
+                    XMVECTOR p0 = XMLoadFloat3(&XMFLOAT3(v0.x, v0.y, v0.z));
+                    XMVECTOR p1 = XMLoadFloat3(&XMFLOAT3(v1.x, v1.y, v1.z));
+                    XMVECTOR p2 = XMLoadFloat3(&XMFLOAT3(v2.x, v2.y, v2.z));
+                    XMVECTOR edge1 = p1 - p0;
+                    XMVECTOR edge2 = p2 - p0;
+                    XMVECTOR normal = XMVector3Normalize(XMVector3Cross(edge1, edge2));
+                    XMFLOAT3 normalF; XMStoreFloat3(&normalF, normal);
+
+                    v0.nx = -normalF.x; v0.ny = -normalF.y; v0.nz = -normalF.z;
+                    v1.nx = -normalF.x; v1.ny = -normalF.y; v1.nz = -normalF.z;
+                    v2.nx = -normalF.x; v2.ny = -normalF.y; v2.nz = -normalF.z;
+
+                    CalculateTangentBinormal(v0, v1, v2);
+
+                    obj_data->processed_vertices[processed_v_idx++] = v0;
+                    obj_data->processed_vertices[processed_v_idx++] = v1;
+                    obj_data->processed_vertices[processed_v_idx++] = v2;
+                }
+            }
+        }
+        current_original_vert_index += num_poly_verts; // Advance the counter for the original vertex source
+    }
+    obj_data->num_processed_vertices = processed_v_idx; // The actual count of vertices written
+    obj_data->is_preprocessed = true;
+}
+
 int FindModelID(char* p)
 {
 	int i = 0;
@@ -1935,9 +2241,131 @@ void DrawItems(float fElapsedTime)
 
 void PlayerToD3DIndexedVertList(int pmodel_id, int curr_frame, float angle, int texture_alias, int tex_flag, float xt, float yt, float zt)
 {
+    // Path for pre-processed indexed models (3DS)
+    if (pmdata[pmodel_id].use_indexed_primitive == TRUE &&
+        pmdata[pmodel_id].processed_base_vertices != nullptr &&
+        pmdata[pmodel_id].num_processed_base_vertices > 0)
+    {
+        float wx = xt;
+        float wy = yt;
+        float wz = zt;
+        float cosine = (float)cos(angle * k); // k is XM_PI / 180.0f
+        float sine = (float)sin(angle * k);
 
-	float qdist = 0;
-	int i, j;
+        int start_cnt_for_model = cnt;
+        if (number_of_polys_per_frame >= MAX_NUM_QUADS) return; // Safety break
+
+        for (int j_idx = 0; j_idx < pmdata[pmodel_id].num_processed_base_vertices; ++j_idx)
+        {
+            if (cnt >= MAX_NUM_QUADS * 10) break; // Safety break for src_v (adjust multiplier if needed)
+
+            const D3DVERTEX2* local_vert = &pmdata[pmodel_id].processed_base_vertices[j_idx];
+
+            float lx = local_vert->x;
+            float ly = local_vert->y;
+            float lz = local_vert->z;
+            float lnx = local_vert->nx;
+            float lny = local_vert->ny;
+            float lnz = local_vert->nz;
+            float lnmx = local_vert->nmx;
+            float lnmy = local_vert->nmy;
+            float lnmz = local_vert->nmz;
+
+            float rx, ry, rz;
+            float rnx, rny, rnz;  // Rotated normal
+            float rnmx, rnmy, rnmz; // Rotated tangent
+
+            // Apply world transformation (incorporating weapondrop logic from original else block)
+            if (weapondrop == 1) // weapondrop and fDot2 are global/extern
+            {
+                // Pitch transformation (simplified from original, may need full version if problematic)
+                rx = (ly * sinf(fDot2 * k) + lx * cosf(fDot2 * k));
+                ry = (ly * cosf(fDot2 * k) - lx * sinf(fDot2 * k));
+                rz = lz;
+                // Rotation for normal & tangent (pitch only, then yaw)
+                rnx = (lny * sinf(fDot2 * k) + lnx * cosf(fDot2 * k));
+                rny = (lny * cosf(fDot2 * k) - lnx * sinf(fDot2 * k));
+                rnz = lnz;
+                rnmx = (lnmy * sinf(fDot2 * k) + lnmx * cosf(fDot2 * k));
+                rnmy = (lnmy * cosf(fDot2 * k) - lnmx * sinf(fDot2 * k));
+                rnmz = lnmz;
+
+                // Yaw transformation (rotation around Y axis)
+                lx = rx; ly = ry; lz = rz; // Use pitched values for yaw rotation
+                rx = (lx * cosine - lz * sine);
+                ry = ly;
+                rz = (lx * sine + lz * cosine);
+
+                lnx = rnx; lny = rny; lnz = rnz; // Use pitched normals for yaw
+                rnx = (lnx * cosine - lnz * sine);
+                rny = lny;
+                rnz = (lnx * sine + lnz * cosine);
+
+                lnmx = rnmx; lnmy = rnmy; lnmz = rnmz; // Use pitched tangents for yaw
+                rnmx = (lnmx * cosine - lnmz * sine);
+                rnmy = lnmy;
+                rnmz = (lnmx * sine + lnmz * cosine);
+            }
+            else // No weapondrop
+            {
+                rx = (lx * cosine - lz * sine);
+                ry = ly;
+                rz = (lx * sine + lz * cosine);
+
+                rnx = (lnx * cosine - lnz * sine);
+                rny = lny;
+                rnz = (lnx * sine + lnz * cosine);
+
+                rnmx = (lnmx * cosine - lnmz * sine);
+                rnmy = lnmy;
+                rnmz = (lnmx * sine + lnmz * cosine);
+            }
+
+            src_v[cnt].x = rx + wx;
+            src_v[cnt].y = ry + wy;
+            src_v[cnt].z = rz + wz;
+
+            src_v[cnt].nx = rnx; src_v[cnt].ny = rny; src_v[cnt].nz = rnz;
+            src_v[cnt].nmx = rnmx; src_v[cnt].nmy = rnmy; src_v[cnt].nmz = rnmz;
+
+            src_v[cnt].tu = local_vert->tu;
+            src_v[cnt].tv = local_vert->tv;
+            src_collide[cnt] = 1; // Typically models are collidable
+            cnt++;
+        }
+
+        ObjectsToDraw[number_of_polys_per_frame].srcstart = start_cnt_for_model;
+        ObjectsToDraw[number_of_polys_per_frame].vertsperpoly = pmdata[pmodel_id].num_processed_base_vertices;
+        ObjectsToDraw[number_of_polys_per_frame].facesperpoly = pmdata[pmodel_id].num_processed_base_vertices / 3;
+        ObjectsToDraw[number_of_polys_per_frame].texture = texture_alias;
+        ObjectsToDraw[number_of_polys_per_frame].vert_index = number_of_polys_per_frame;
+
+        float centroidx = wx; float centroidy = wy; float centroidz = wz; // Simplified centroid for distance
+        float q_dist = FastDistance(m_vEyePt.x - centroidx, m_vEyePt.y - centroidy, m_vEyePt.z - centroidz);
+        ObjectsToDraw[number_of_polys_per_frame].dist = q_dist;
+
+        dp_commands[number_of_polys_per_frame] = D3DPT_TRIANGLELIST;
+        dp_command_index_mode[number_of_polys_per_frame] = USE_NON_INDEXED_DP; // Since it's a pre-processed list
+
+        if (number_of_polys_per_frame < (sizeof(verts_per_poly)/sizeof(verts_per_poly[0])) ) {
+            verts_per_poly[number_of_polys_per_frame] = pmdata[pmodel_id].num_processed_base_vertices;
+        }
+        if (number_of_polys_per_frame < MAX_NUM_TEXTURES) {
+            texture_list_buffer[number_of_polys_per_frame] = texture_alias;
+        }
+
+
+        num_triangles_in_scene += ObjectsToDraw[number_of_polys_per_frame].facesperpoly;
+        num_verts_in_scene += ObjectsToDraw[number_of_polys_per_frame].vertsperpoly;
+        num_dp_commands_in_scene++;
+        number_of_polys_per_frame++;
+
+        return; // Finished processing this pre-processed model
+    }
+    else // Original logic for non-preprocessed or non-indexed models
+    {
+	    float qdist = 0; // Original qdist, distinct from q_dist in if block
+	    int i, j;
 	int num_verts_per_poly;
 	int num_faces_per_poly;
 	int num_poly;

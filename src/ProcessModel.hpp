@@ -13,6 +13,9 @@
 #define D3DFVF_CUSTOMVERTEX (D3DFVF_XYZ|D3DFVF_DIFFUSE|D3DFVF_TEX1|D3DFVF_NORMAL)
 #endif
 
+// Forward declaration for OBJECTDATA from world.hpp
+struct OBJECTDATA;
+
 extern int monstercull[1000];
 extern int monstercount;
 extern float fDot2;
@@ -34,6 +37,8 @@ int FindGunTexture(char* p);
 int CycleBitMap(int i);
 int CalculateView(XMFLOAT3 EyeBall, XMFLOAT3 LookPoint, float angle);
 void ObjectToD3DVertList(int ob_type, float angle, int oblist_index);
+
+void PreProcessStaticObjectGeometry(OBJECTDATA* obj_data);
 
 
 #endif 

@@ -11,6 +11,8 @@
 #include "world.hpp"
 #include "Import3DS.hpp"
 #include "LoadWorld.hpp"
+#include "ProcessModel.hpp" // For CalculateTangentBinormal
+#include <vector> // For std::nothrow if new (std::nothrow) is used
 
 OBJECT3DS oblistitem[MAX_NUM_3DS_OBJECTS];
 
@@ -793,6 +795,96 @@ BOOL Import3DS(char* filename, int pmodel_id, float scale)
 	pmdata[pmodel_id].use_indexed_primitive = TRUE;
 
 	ReleaseTempMemory();
+
+    // Pre-process base mesh if it's an indexed primitive (3DS model)
+    if (pmdata[pmodel_id].use_indexed_primitive == TRUE && total_num_faces > 0 && total_num_verts > 0)
+    {
+        pmdata[pmodel_id].num_processed_base_vertices = total_num_faces * 3;
+        pmdata[pmodel_id].processed_base_vertices = new (std::nothrow) D3DVERTEX2[pmdata[pmodel_id].num_processed_base_vertices];
+
+        if (pmdata[pmodel_id].processed_base_vertices != nullptr)
+        {
+            D3DVERTEX2* current_processed_vert_ptr = pmdata[pmodel_id].processed_base_vertices;
+
+            for (int face_idx = 0; face_idx < total_num_faces; ++face_idx)
+            {
+                // Check if accessing pmdata[pmodel_id].f is safe
+                if ((face_idx * 3 + 2) >= (total_num_faces * 3) ) { // total_num_faces * 3 is the size of .f and .t arrays based on previous loops
+                    break;
+                }
+
+                D3DVERTEX2 face_actual_verts[3]; // Temp store for CalculateTangentBinormal call
+
+                for (int vert_in_face_idx = 0; vert_in_face_idx < 3; ++vert_in_face_idx)
+                {
+                    int vidx = pmdata[pmodel_id].f[face_idx * 3 + vert_in_face_idx];
+
+                    if (vidx < 0 || vidx >= total_num_verts) {
+                        // Invalid vertex index
+                        (current_processed_vert_ptr + vert_in_face_idx)->x = 0;
+                        (current_processed_vert_ptr + vert_in_face_idx)->y = 0;
+                        (current_processed_vert_ptr + vert_in_face_idx)->z = 0;
+                        (current_processed_vert_ptr + vert_in_face_idx)->tu = 0;
+                        (current_processed_vert_ptr + vert_in_face_idx)->tv = 0;
+                        (current_processed_vert_ptr + vert_in_face_idx)->nx = 0;
+                        (current_processed_vert_ptr + vert_in_face_idx)->ny = 1; // Default normal
+                        (current_processed_vert_ptr + vert_in_face_idx)->nz = 0;
+                        (current_processed_vert_ptr + vert_in_face_idx)->nmx = 0;
+                        (current_processed_vert_ptr + vert_in_face_idx)->nmy = 0;
+                        (current_processed_vert_ptr + vert_in_face_idx)->nmz = 0;
+                        // Store in temp array for CalculateTangentBinormal
+                        face_actual_verts[vert_in_face_idx] = *(current_processed_vert_ptr + vert_in_face_idx);
+                        continue; // Skip further processing for this vertex if index is bad
+                    }
+
+                    (current_processed_vert_ptr + vert_in_face_idx)->x = pmdata[pmodel_id].w[0][vidx].x;
+                    (current_processed_vert_ptr + vert_in_face_idx)->y = pmdata[pmodel_id].w[0][vidx].y;
+                    (current_processed_vert_ptr + vert_in_face_idx)->z = pmdata[pmodel_id].w[0][vidx].z;
+
+                    (current_processed_vert_ptr + vert_in_face_idx)->tu = pmdata[pmodel_id].t[face_idx * 3 + vert_in_face_idx].x * pmdata[pmodel_id].skx;
+                    (current_processed_vert_ptr + vert_in_face_idx)->tv = 1.0f - (pmdata[pmodel_id].t[face_idx * 3 + vert_in_face_idx].y * pmdata[pmodel_id].sky);
+
+                    // Store in temp array for CalculateTangentBinormal
+                    face_actual_verts[vert_in_face_idx] = *(current_processed_vert_ptr + vert_in_face_idx);
+                }
+
+                // Calculate Normal for this face
+                XMVECTOR p0 = XMLoadFloat3(&XMFLOAT3(face_actual_verts[0].x, face_actual_verts[0].y, face_actual_verts[0].z));
+                XMVECTOR p1 = XMLoadFloat3(&XMFLOAT3(face_actual_verts[1].x, face_actual_verts[1].y, face_actual_verts[1].z));
+                XMVECTOR p2 = XMLoadFloat3(&XMFLOAT3(face_actual_verts[2].x, face_actual_verts[2].y, face_actual_verts[2].z));
+                XMVECTOR edge1 = p1 - p0;
+                XMVECTOR edge2 = p2 - p0;
+                XMVECTOR normal_vec = XMVector3Normalize(XMVector3Cross(edge1, edge2));
+                XMFLOAT3 normalF; XMStoreFloat3(&normalF, normal_vec);
+
+                // Assign same normal to all 3 vertices of the face and copy to main buffer
+                for(int k=0; k<3; ++k) {
+                    (current_processed_vert_ptr + k)->nx = -normalF.x;
+                    (current_processed_vert_ptr + k)->ny = -normalF.y;
+                    (current_processed_vert_ptr + k)->nz = -normalF.z;
+                    face_actual_verts[k].nx = -normalF.x; // Update temp copy too for tangent calc
+                    face_actual_verts[k].ny = -normalF.y;
+                    face_actual_verts[k].nz = -normalF.z;
+                }
+
+                CalculateTangentBinormal(face_actual_verts[0], face_actual_verts[1], face_actual_verts[2]);
+
+                // Copy tangents back to the main buffer
+                for(int k=0; k<3; ++k) {
+                    (current_processed_vert_ptr + k)->nmx = face_actual_verts[k].nmx;
+                    (current_processed_vert_ptr + k)->nmy = face_actual_verts[k].nmy;
+                    (current_processed_vert_ptr + k)->nmz = face_actual_verts[k].nmz;
+                }
+
+                current_processed_vert_ptr += 3; // Advance pointer by 3 vertices
+            }
+        }
+        else
+        {
+            pmdata[pmodel_id].num_processed_base_vertices = 0; // Allocation failed
+        }
+    }
+
 
 	//Write_pmdata_debugfile(m_hWnd, pmodel_id);
 
